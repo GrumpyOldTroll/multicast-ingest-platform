@@ -1,0 +1,25 @@
+tcpdump -n -vvv pim output:
+
+(running on the ingest-rtr upstream interface)
+
+join:
+
+04:12:35.108800 IP (tos 0x0, ttl 1, id 640, offset 0, flags [none], proto PIM (103), length 54)
+    10.8.1.1 > 224.0.0.13: PIMv2, length 34
+	Join / Prune, cksum 0xccc9 (correct), upstream-neighbor: 10.8.1.2
+	  1 group(s), holdtime: 3m30s
+	    group #1: 233.44.15.9, joined sources: 1, pruned sources: 0
+	      joined source #1: 129.174.131.51(S)
+
+prune:
+
+04:12:46.759958 IP (tos 0x0, ttl 1, id 643, offset 0, flags [none], proto PIM (103), length 54)
+    10.8.1.1 > 224.0.0.13: PIMv2, length 34
+	Join / Prune, cksum 0xccc9 (correct), upstream-neighbor: 10.8.1.2
+	  1 group(s), holdtime: 3m30s
+	    group #1: 233.44.15.9, joined sources: 0, pruned sources: 1
+	      pruned source #1: 129.174.131.51(S)
+
+
+
+

@@ -1,0 +1,2 @@
+#!/bin/sh
+docker exec -i -t ingest-frr /usr/bin/vtysh

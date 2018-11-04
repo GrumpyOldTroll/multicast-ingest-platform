@@ -1,0 +1,21 @@
+[Unit]
+Description=Tack on an upstream nat that avoids the DOCKER-ISOLATION
+Wants=network-online.target
+After=snap.docker.dockerd.service
+
+[Service]
+ExecStart=/sbin/iptables -t nat -A POSTROUTING -o enp2s0 -j MASQUERADE
+ExecStart=/sbin/iptables -I FORWARD 1 -i enx20c9d02c4837 -j ACCEPT
+ExecStart=/sbin/iptables -I FORWARD 1 -i enx000ec68f9205 -j ACCEPT
+ExecStart=/sbin/iptables -I FORWARD 1 -i enp2s0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+ExecStop=/sbin/iptables -t nat -D POSTROUTING -o enp2s0 -j MASQUERADE
+ExecStop=/sbin/iptables -D FORWARD -i enx20c9d02c4837 -j ACCEPT
+ExecStop=/sbin/iptables -D FORWARD -i enx000ec68f9205 -j ACCEPT
+ExecStop=/sbin/iptables -D FORWARD -i enp2s0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+Type=oneshot
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

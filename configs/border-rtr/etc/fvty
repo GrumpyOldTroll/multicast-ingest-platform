@@ -1,0 +1,2 @@
+#!/bin/sh
+docker exec -i -t border-frr /usr/bin/vtysh

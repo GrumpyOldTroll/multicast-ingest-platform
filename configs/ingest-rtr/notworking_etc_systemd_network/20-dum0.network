@@ -1,0 +1,10 @@
+[Match]
+Name=dum0
+
+[Link]
+Multicast=yes
+
+[Network]
+Address=10.12.1.100/24
+Bridge=xamtbr0
+

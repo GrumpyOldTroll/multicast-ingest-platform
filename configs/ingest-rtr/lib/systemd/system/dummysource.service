@@ -1,0 +1,12 @@
+[Unit]
+Description=Bring up a dummy source interface
+Wants=network-online.target
+
+[Service]
+ExecStart=/etc/config-dum0.sh
+
+Type=oneshot
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

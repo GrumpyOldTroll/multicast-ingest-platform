@@ -1,0 +1,21 @@
+hack103.jakeholland.net. IN SOA ns1.hack103.jakeholland.net. jakeholland.net.gmail.com (
+                                 21     ; SERIAL
+                                 7200   ; REFRESH
+                                 600    ; RETRY
+                                 120    ; EXPIRE
+                                 60)    ; MINIMUM
+
+  IN NS ns1.hack103.jakeholland.net.
+
+$ORIGIN hack103.jakeholland.net.
+
+ns1 IN A 10.9.1.1
+
+msrc4 IN A 23.212.185.4
+noaasrc IN A 131.128.93.40
+nsfsrc IN A 129.174.131.51
+
+border-rtr IN A 10.9.1.1
+ingest-rtr IN A 10.8.1.2
+access-rtr IN A 10.9.1.3
+

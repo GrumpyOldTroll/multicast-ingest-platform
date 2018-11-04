@@ -1,0 +1,15 @@
+185.212.23.in-addr.arpa. IN SOA ns1.hack103.jakeholland.net. jakeholland.net.gmail.com (
+                                 20     ; SERIAL
+                                 7200   ; REFRESH
+                                 600    ; RETRY
+                                 120    ; EXPIRE
+                                 60)    ; MINIMUM
+
+  IN NS ns1.hack103.jakeholland.net.
+
+$ORIGIN 185.212.23.in-addr.arpa.
+4	IN	PTR	msrc4.hack103.jakeholland.net.
+;4	IN	TXT	"amt(15,0,3,r4v4.amt.akadns.net);"
+;4 IN AMTRELAY 128 0 3 r4v4.amt.akadns.net
+4	IN	TYPE68	\# 21 1003723476342e616d742e616b61646e732e6e6574
+

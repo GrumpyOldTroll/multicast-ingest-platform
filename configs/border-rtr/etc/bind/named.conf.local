@@ -1,0 +1,37 @@
+include "/etc/bind/zones.rfc1918";
+
+logging {
+    channel bind-debug.log {
+        file "/var/log/named/bind-debug.log";
+        severity debug 3;
+    };
+
+    category queries { bind-debug.log; };
+    category query-errors { bind-debug.log; };
+};
+
+zone "hack103.jakeholland.net" {
+    type master;
+    file "/etc/bind/zones/db.hack103.jakeholland.net.zone";
+};
+
+zone "185.212.23.in-addr.arpa" {
+    # source ips for akamai multicast traffic (sender embedded behind relays)
+    # udp://23.212.185.4@232.10.10.2:12000
+    type master;
+    file "/etc/bind/zones/reverse.185.212.23.in-addr.arpa.zone";
+};
+
+zone "51.131.174.129.in-addr.arpa" {
+    # source for nsf knowledge network video native multicasting on internet2
+    # udp://129.174.131.51@233.44.15.9:50001
+    type master;
+    file "/etc/bind/zones/reverse.51.131.174.129.in-addr.arpa.zone";
+};
+
+zone "40.93.128.131.in-addr.arpa" {
+    # source for noaa video(?) native multicasting on internet2
+    # udp://131.128.93.40@233.56.12.1:5501
+    type master;
+    file "/etc/bind/zones/reverse.40.93.128.131.in-addr.arpa.zone";
+};

@@ -1,0 +1,2 @@
+#!/bin/sh
+docker exec -i -t access-frr /usr/bin/vtysh
