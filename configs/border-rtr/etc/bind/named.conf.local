@@ -10,9 +10,9 @@ logging {
     category query-errors { bind-debug.log; };
 };
 
-zone "hack103.jakeholland.net" {
+zone "hackathon.jakeholland.net" {
     type master;
-    file "/etc/bind/zones/db.hack103.jakeholland.net.zone";
+    file "/etc/bind/zones/db.hackathon.jakeholland.net.zone";
 };
 
 zone "185.212.23.in-addr.arpa" {

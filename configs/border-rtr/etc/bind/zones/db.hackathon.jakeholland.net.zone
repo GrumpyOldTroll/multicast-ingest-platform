@@ -1,13 +1,13 @@
-hack103.jakeholland.net. IN SOA ns1.hack103.jakeholland.net. jakeholland.net.gmail.com (
+hackathon.jakeholland.net. IN SOA ns1.hackathon.jakeholland.net. jakeholland.net.gmail.com (
                                  21     ; SERIAL
                                  7200   ; REFRESH
                                  600    ; RETRY
                                  120    ; EXPIRE
                                  60)    ; MINIMUM
 
-  IN NS ns1.hack103.jakeholland.net.
+  IN NS ns1.hackathon.jakeholland.net.
 
-$ORIGIN hack103.jakeholland.net.
+$ORIGIN hackathon.jakeholland.net.
 
 ns1 IN A 10.9.1.1
 

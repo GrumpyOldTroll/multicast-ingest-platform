@@ -1,24 +1,24 @@
-51.131.174.129.in-addr.arpa. IN SOA ns1.hack103.jakeholland.net. jakeholland.net.gmail.com (
-                                 21     ; SERIAL
+51.131.174.129.in-addr.arpa. IN SOA ns1.hackathon.jakeholland.net. jakeholland.net.gmail.com (
+                                 22     ; SERIAL
                                  7200   ; REFRESH
                                  600    ; RETRY
                                  120    ; EXPIRE
                                  60)    ; MINIMUM
 
-  IN NS ns1.hack103.jakeholland.net.
+  IN NS ns1.hackathon.jakeholland.net.
 
 $ORIGIN 51.131.174.129.in-addr.arpa.
 
-  IN	PTR	nsfsrc.hack103.jakeholland.net.
+  IN	PTR	nsfsrc.hackathon.jakeholland.net.
 ; IN AMTRELAY 128 0 1 162.250.137.254
 ; IN AMTRELAY 128 0 1 198.38.23.145
 
-  IN TYPE68 \# ( 6 ; length
+  IN TYPE260 \# ( 6 ; length
     10 ; precedence
     01 ; D=0, relay type=1
     a2fa89fe ) ; 162.250.137.254
 
-  IN TYPE68 \# ( 6 ; length
+  IN TYPE260 \# ( 6 ; length
     10 ; precedence
     01 ; D=0, relay type=1
     c6261791 ) ; 198.38.23.145

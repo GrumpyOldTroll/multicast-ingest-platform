@@ -197,7 +197,8 @@ class AMTRelayOption(object):
 
     def parse_response_line(response_line):
         # example:
-        # '\# 21 1003723476342E616D742E616B61646E732E6E6574'
+        # '\# 22 1003047234763403616d7406616b61646e73036e6574
+        # precedence 128, dbit=0, type 3 (dns name), 'r4v4.amt.akadns.net'
         out = response_line
         out_sep = out.split(None, 2)
         if len(out_sep) != 3:
@@ -232,7 +233,17 @@ class AMTRelayOption(object):
                 elif typ == 2:
                     val = ipaddress.IPv6Address(bin_content)
                 elif typ == 3:
-                    val = bin_content.decode()
+                    idx = 0
+                    name = ''
+                    while idx < len(bin_content):
+                        hoplen=bin_content[idx]
+                        idx += 1
+                        if idx + hoplen > len(bin_content) or hoplen < 0:
+                            logger.error('bad wire-encoded dns name (hoplen=%d at %d with %d left, so far name="%s"):\n%s\n%s' % (hoplen, idx, len(bin_content)-idx, name, content, '  '*idx + '^'))
+                            return None
+                        name += bin_content[idx:idx + hoplen].decode() + '.'
+                        idx += hoplen
+                    val = name
                 else:
                     logger.error('unknown type %d parsed from "%s" returned from "%s"' % (typ, out, cmd))
                     return None
@@ -316,6 +327,8 @@ ed7e24f6b45e        mip-frr:latest                    "/sbin/tini -- /usr/…"  
         pass
 
     def pick_relay_for_source(self, options):
+        if not options:
+            return None
         if len(options) < 1:
             return None
         worse_options = sorted(options, key=lambda x: x.precedence)
@@ -354,7 +367,7 @@ ed7e24f6b45e        mip-frr:latest                    "/sbin/tini -- /usr/…"  
 
     def find_relay_options_for_source(self, src_ip):
         name = src_ip.reverse_pointer
-        cmd = ['/usr/bin/dig', '+short', '-t', 'TYPE68', name]
+        cmd = ['/usr/bin/dig', '+short', '-t', 'TYPE260', name]
         dig_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         out, err = dig_p.communicate(cmd)
         retcode = dig_p.wait()
@@ -366,7 +379,7 @@ ed7e24f6b45e        mip-frr:latest                    "/sbin/tini -- /usr/…"  
             logger.warning('stderr output from %s: "%s"' % (cmd, err))
 
         if not out:
-            # TBD: check PTR and recurse on CNAME/DNAME
+            # TBD: recurse on CNAME/DNAME, if that's not happening?
             logger.warning('no relay found from %s' % (cmd))
             return None
 
@@ -529,12 +542,12 @@ ed7e24f6b45e        mip-frr:latest                    "/sbin/tini -- /usr/…"  
             logger.info('removing %s from gw %s' % (sg, gw))
             del(gw.live_sgs[ip_sg])
             other_sg = None
-            for other in gw.live_sgs:
+            for other in gw.live_sgs.values():
                 if other.source == sg.source:
                     other_sg = other
                     break
             if other_sg:
-                logger.info('source %s stays alive for other sg %s' % (sg.source, other_src))
+                logger.info('source %s stays alive for other sg %s' % (sg.source, other_sg))
             else:
                 if sg.source in self.relay_ips:
                     logger.info('source %s removed from relay_ips (%s)' % (sg.source, self.relay_ips[sg.source]))
