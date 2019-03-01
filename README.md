@@ -136,9 +136,9 @@ Remember to use your own mac addresses:
 ~~~
 # /etc/udev/rules.d/10-access-rtr-inames.rules
 # upstream, to internet through border router
-SUBSYSTEM=="net", ACTION=="add", DRIVERS=="?*", ATTR{address}=="00:e0:4c:c1:55:1e", NAME="aup0"
+SUBSYSTEM=="net", ACTION=="add", DRIVERS=="?*", ATTR{address}=="00:e0:4c:c1:55:1e", NAME="xup0"
 # downstream, to clients
-SUBSYSTEM=="net", ACTION=="add", DRIVERS=="?*", ATTR{address}=="c8:b3:73:0f:34:bc", NAME="adn0"
+SUBSYSTEM=="net", ACTION=="add", DRIVERS=="?*", ATTR{address}=="c8:b3:73:0f:34:bc", NAME="xdn0"
 ~~~
 
 Also set up netplan to use this instead of the auto-configured interface name:
