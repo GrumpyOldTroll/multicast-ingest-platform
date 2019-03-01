@@ -1,0 +1,17 @@
+[Unit]
+Description=Pimwatch
+Wants=network-online.target
+Requires=systemd-networkd.socket
+After=systemd-networkd.socket
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/log/pimwatch
+ExecStart=/usr/bin/pimwatch.py irf0
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+

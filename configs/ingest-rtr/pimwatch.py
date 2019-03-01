@@ -186,16 +186,62 @@ def sg_joinprune_watch(ifname):
 
 class AMTRelayOption(object):
     def __init__(self, precedence, discovery_optional, typ, value):
-        self.precedence = precedence
-        self.discovery_optional = discovery_optional
-        self.typ = typ
+        self.precedence = int(precedence)
+        self.discovery_optional = int(discovery_optional)
+        self.typ = int(typ)
         self.value = value
         if typ == 1 or typ == 2:
-            self.ip = value
+            self.ip = ipaddress.ip_address(value)
         else:
             self.ip = None
 
-    def parse_response_line(response_line):
+    def __str__(self):
+        return 'prec=%d,d=%d,typ=%d,val=%s' % (self.precedence, self.discovery_optional, self.typ, self.value)
+
+    def parse_response(out, cmd):
+        '''
+        example output:
+$ dig +noall +answer +nocomments -t TYPE260 3.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.e.4.1.0.0.6.2.ip6.arpa
+3.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.e.4.1.0.0.6.2.ip6.arpa. 7054 IN CNAME	3.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.v6.driad.akastream2.com.
+3.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.v6.driad.akastream2.com. 43054 IN TYPE260 \# 22 1003047233763603616D7406616B61646E73036E6574
+$ dig +noall +answer +nocomments -t TYPE260 5.185.212.23.in-addr.arpa
+5.185.212.23.in-addr.arpa. 7200	IN	CNAME	5.v4.driad.akastream2.com.
+5.v4.driad.akastream2.com. 43200 IN	TYPE260	\# 22 1003047235763403616D7406616B61646E73036E6574
+        '''
+        options = []
+        for line in out.split('\n'):
+            if not line:
+                continue
+
+            try:
+                domain, expiry, _, typ, val = line.split(maxsplit=4)
+            except ValueError as e:
+                logger.warning('skipping line: error "%s" parsing dig output line "%s": failed to map into "domain, expiry, IN, type, value" (cmd=%s)' % (e, line, cmd))
+                continue
+
+            if typ == 'CNAME' or typ=='DNAME':
+                # we expect some cname resolving here, see examples.
+                # TBD: should we do something with these?
+                continue
+
+            if typ != 'TYPE260' and typ != 'AMTRELAY':
+                logger.warning('unexpected type %s in dig output line %s, skipping (cmd=%s)' % (typ, line, cmd))
+                continue
+
+            opt = None
+            if typ == 'AMTRELAY':
+                precedence, discovery_optional, valtyp, valval = val.split()
+                opt = AMTRelayOption(int(precedence), int(discovery_optional), int(valtyp), valval)
+            else:
+                opt = AMTRelayOption.parse_generic_amtrr_data(val, cmd)
+
+            if not opt:
+                continue
+            logger.info('found relay option %s' % opt)
+            options.append(opt)
+        return options
+
+    def parse_generic_amtrr_data(response_line, cmd):
         # example:
         # '\# 22 1003047234763403616d7406616b61646e73036e6574
         # precedence 128, dbit=0, type 3 (dns name), 'r4v4.amt.akadns.net'
@@ -315,16 +361,39 @@ class ChannelManager(object):
         self.badness_duration = datetime.timedelta(hours=1)
 
     def check_pre_existing(self):
-        # TBD: check for pimwatch running for this interface (warn and exit)
-        # find pre-existing containers that came from pimwatch:
+        '''find and stop pre-existing containers that came from pimwatch:
+$ docker container ls --format={{.Names}}
+pimwatch-join-23.212.185.5-232.10.2.4
+pimwatch-join-23.212.185.5-232.10.2.1
+pimwatch-join-23.212.185.5-232.1.1.1
+pimwatch-gw-18.144.22.247
+ingest-frr
         '''
-$ docker container ls
-CONTAINER ID        IMAGE                             COMMAND                  CREATED             STATUS              PORTS               NAMES
-fd539633d835        grumpyoldtroll/iperf-ssm:latest   "/bin/iperf --server…"   5 hours ago         Up 5 hours                              join-129.174.131.51-233.44.15.9
-c9e073525da3        grumpyoldtroll/amtgw:latest       "/bin/run_amtgwd 162…"   5 hours ago         Up 5 hours                              amtgw-162.250.137.254
-ed7e24f6b45e        mip-frr:latest                    "/sbin/tini -- /usr/…"   5 days ago          Up 7 hours                              ingest-frr
-        '''
-        pass
+        cmd = ['/snap/bin/docker', 'container', 'ls', '--format={{.Names}}']
+        dock_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        out, err = dock_p.communicate(cmd)
+        retcode = dock_p.wait()
+        if retcode != 0:
+            logger.warning('return code %d from %s, out="%s", err="%s"' % (retcode, cmd, out, err))
+            return
+
+        if err:
+            logger.warning('stderr output from %s: "%s"' % (cmd, err))
+
+        for line in out.split('\n'):
+            if line.startswith('pimwatch-'):
+                logger.warning('shutting down pre-existing pimwatch container %s' % line)
+
+                cmd = ['/snap/bin/docker', 'stop', line.strip()]
+                dock_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+                out, err = dock_p.communicate(cmd)
+                retcode = dock_p.wait()
+                if retcode != 0:
+                    logger.warning('return code %d from %s, out="%s", err="%s"' % (retcode, cmd, out, err))
+                    return
+
+                if err:
+                    logger.warning('stderr output from %s: "%s"' % (cmd, err))
 
     def pick_relay_for_source(self, options):
         if not options:
@@ -347,6 +416,7 @@ ed7e24f6b45e        mip-frr:latest                    "/sbin/tini -- /usr/…"  
                 worse_options = new_worse
             assert(len(options) > 0)
             idx = random.randrange(len(options))
+            logger.info('randomly chose idx %d of %d relay options' % (idx, len(options)))
             opt = options[idx]
             bad_time = self.bad_relays.get(opt.value)
             if not bad_time:
@@ -367,7 +437,7 @@ ed7e24f6b45e        mip-frr:latest                    "/sbin/tini -- /usr/…"  
 
     def find_relay_options_for_source(self, src_ip):
         name = src_ip.reverse_pointer
-        cmd = ['/usr/bin/dig', '+short', '-t', 'TYPE260', name]
+        cmd = ['/usr/bin/dig', '+noall', '+answer', '+nocomments', '-t', 'TYPE260', name]
         dig_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         out, err = dig_p.communicate(cmd)
         retcode = dig_p.wait()
@@ -378,20 +448,7 @@ ed7e24f6b45e        mip-frr:latest                    "/sbin/tini -- /usr/…"  
         if err:
             logger.warning('stderr output from %s: "%s"' % (cmd, err))
 
-        if not out:
-            # TBD: recurse on CNAME/DNAME, if that's not happening?
-            logger.warning('no relay found from %s' % (cmd))
-            return None
-
-        options = []
-        for line in out.split('\n'):
-            if not line:
-                continue
-            opt = AMTRelayOption.parse_response_line(line)
-            if not opt:
-                continue
-            options.append(opt)
-        return options
+        return AMTRelayOption.parse_response(out, cmd)
 
     def find_relay(self, src_ip):
         options = self.find_relay_options_for_source(src_ip)
@@ -436,7 +493,7 @@ ed7e24f6b45e        mip-frr:latest                    "/sbin/tini -- /usr/…"  
         logger.info('launching gateway to relay %s' % (relay_ip,))
 
         dkr = '/snap/bin/docker'
-        nwname = 'xamtvlan0'
+        nwname = 'xamtbr0'
         contname = 'pimwatch-gw-%s' % (relay_ip.exploded)
         imagename = 'grumpyoldtroll/amtgw:latest'
         cmd = [dkr, 'create', '--rm', '--name', contname, '--privileged', imagename, str(relay_ip)]
@@ -490,7 +547,7 @@ ed7e24f6b45e        mip-frr:latest                    "/sbin/tini -- /usr/…"  
         source = ipaddress.ip_address(source)
         group = ipaddress.ip_address(group)
         dkr = '/snap/bin/docker'
-        nwname = 'xamtvlan0'
+        nwname = 'xamtbr0'
         contname = 'pimwatch-join-%s-%s' % (source.exploded, group.exploded)
         imagename = 'grumpyoldtroll/iperf-ssm:latest'
         # TBD: support v6--iperf command is different

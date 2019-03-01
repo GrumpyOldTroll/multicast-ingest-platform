@@ -15,12 +15,13 @@ zone "hackathon.jakeholland.net" {
     file "/etc/bind/zones/db.hackathon.jakeholland.net.zone";
 };
 
-zone "185.212.23.in-addr.arpa" {
-    # source ips for akamai multicast traffic (sender embedded behind relays)
-    # udp://23.212.185.4@232.10.10.2:12000
-    type master;
-    file "/etc/bind/zones/reverse.185.212.23.in-addr.arpa.zone";
-};
+# this zone has a globally deployed config as of Feb 2019
+#zone "185.212.23.in-addr.arpa" {
+#    # source ips for akamai multicast traffic (sender embedded behind relays)
+#    # udp://23.212.185.4@232.10.10.2:12000
+#    type master;
+#    file "/etc/bind/zones/reverse.185.212.23.in-addr.arpa.zone";
+#};
 
 zone "51.131.174.129.in-addr.arpa" {
     # source for nsf knowledge network video native multicasting on internet2
