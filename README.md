@@ -73,7 +73,7 @@ Normal lab machine setup:
 	sudo shutdown -r now
 	~~~
 
-##Set Up Interfaces
+## Set Up Interfaces
 
 Ubuntu 18 started using interface names that [depend on the hardware](https://www.freedesktop.org/wiki/Software/systemd/PredictableNetworkInterfaceNames/).
 
@@ -211,7 +211,7 @@ Reboot: `sudo shutdown -r now`
 
 There are other approaches besides the one I'm using for configuring interface names.  It looks like [systemd.link](https://www.freedesktop.org/software/systemd/man/systemd.link.html) is a recommended way to do this, by creating files with names ending in ".link" in /etc/systemd/network or /usr/lib/systemd/network.  However, it didn't work for me on Ubuntu 18.04.2.  Perhaps this will change in the future, and if you're having trouble with the udev rules, consider trying it.
 
-##Get FRR Docker Image
+## Get FRR Docker Image
 
 You may want to [build your own](build-frr.md), or you may want to use a pre-built image.  As of this writing, there are a [few options](https://github.com/FRRouting/frr/tree/master/docker) for pre-built images, but [ajones17/frr:latest](https://hub.docker.com/r/ajones17/frr) seems to try to auto-track the latest build, and keeps a history so that old builds can still be accessed if new ones break something by [using a number like "662"](https://hub.docker.com/r/ajones17/frr/tags) instead of "latest".
 
