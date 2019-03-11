@@ -11,7 +11,7 @@ This write-up describes the full receive network setup using [Free Range Routing
 
 ## Proof of Concept
 
-The proof of concept itself is just [pimwatch.py](pimwatch.py), which runs:
+The proof of concept itself is just [pimwatch.py](configs/ingest-rtr/pimwatch.py), which runs:
 
  * [tcpdump](https://manpages.debian.org/stretch/tcpdump/tcpdump.8.en.html) to watch [PIM](https://tools.ietf.org/html/rfc7761) packets.
  * [dig](https://manpages.debian.org/stretch/dnsutils/dig.1.en.html) for DRIAD's [DNS querying](https://tools.ietf.org/html/draft-ietf-mboned-driad-amt-discovery-01#section-2.2)
@@ -45,13 +45,6 @@ Think of this as a simplified version of one of the [examples in the DRIAD spec]
 Normal lab machine setup:
 
  * add your keys and `chmod 0600 .ssh/authorized_keys`, if desired; maybe visudo to add `user ALL=NOPASSWD: ALL` at the end if you're crazy and/or well-isolated.
- * catch up your updates:
-
-	~~~
-	sudo apt update && \
-	sudo apt dist-upgrade -y && \
-	sudo apt autoremove -y
-	~~~
 
  * prevent your drive from filling up with old kernels over time, since updates are for some reason auto-downloaded but not auto-cleaned by default:
 
@@ -65,6 +58,14 @@ Normal lab machine setup:
 	~~~
 	sudo groupadd docker
 	sudo usermod -aG docker $USER
+	~~~
+
+ * catch up your updates:
+
+	~~~
+	sudo apt update && \
+	sudo apt dist-upgrade -y && \
+	sudo apt autoremove -y
 	~~~
 
  * restart:
