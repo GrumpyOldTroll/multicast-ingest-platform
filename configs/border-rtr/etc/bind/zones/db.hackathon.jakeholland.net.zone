@@ -9,13 +9,14 @@ hackathon.jakeholland.net. IN SOA ns1.hackathon.jakeholland.net. jakeholland.net
 
 $ORIGIN hackathon.jakeholland.net.
 
-ns1 IN A 10.9.1.1
+ns1 IN A 10.8.1.1
 
 msrc4 IN A 23.212.185.4
+msrc5 IN A 23.212.185.5
 noaasrc IN A 131.128.93.40
 nsfsrc IN A 129.174.131.51
 
-border-rtr IN A 10.9.1.1
-ingest-rtr IN A 10.8.1.2
-access-rtr IN A 10.9.1.3
+border-rtr IN A 10.8.1.1
+ingest-rtr IN A 10.9.1.2
+access-rtr IN A 10.8.1.2
 

@@ -1,0 +1,17 @@
+# /etc/netplan/10-access-rtr-init.yaml
+network:
+    ethernets:
+        xup0:
+            addresses: [10.8.1.2/24]
+            dhcp4: true
+            optional: true
+            nameservers:
+                   addresses: [10.8.1.1]
+            # override nameservers if necessary:
+            # nameservers:
+            #        addresses: [8.8.8.8,8.8.4.4]
+        xdn0:
+            addresses: [10.7.1.1/24]
+            dhcp4: false
+            optional: true
+    version: 2

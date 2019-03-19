@@ -1,0 +1,19 @@
+# /etc/netplan/10-border-rtr-init.yaml
+network:
+    ethernets:
+        bup0:
+            addresses: []
+            dhcp4: true
+            optional: true
+            # override nameservers if necessary:
+            # nameservers:
+            #        addresses: [8.8.8.8,8.8.4.4]
+        bdn0:
+            addresses: [10.8.1.1/24]
+            dhcp4: false
+            optional: true
+        brf0:
+            addresses: [10.9.1.1/24]
+            dhcp4: false
+            optional: true
+    version: 2

@@ -34,6 +34,8 @@ nhrpd=no
 eigrpd=no
 babeld=no
 sharpd=no
-staticd=yes
+# staticd is automatic when zebra is started.
+# doing it twice fails.
+staticd=no
 pbrd=no
 bfdd=no
