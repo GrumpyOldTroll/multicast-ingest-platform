@@ -86,15 +86,15 @@ For ease of config, I've got dhcp client on for ingest-rtr and access-rtr runnin
 Check the scripts for details.  In all 3 cases, it builds frr locally from source and installs it, and turns on ip forwarding.  Extra details:
 
  * [border-rtr](configs/border-rtr/setup.sh):
-  * runs dhcp client upstream
-  * runs dhcp server on both downstream interfaces (mainly for convenience during setup of the other 2, and could reasonably be turned off after they're up)
-  * runs a dns server
-  * runs a NAT with iptables for traffic from downstream
+   * runs dhcp client upstream
+   * runs dhcp server on both downstream interfaces (mainly for convenience during setup of the other 2, and could reasonably be turned off after they're up)
+   * runs a dns server
+   * runs a NAT with iptables for traffic from downstream
  * [access-rtr](configs/access-rtr/setup.sh):
-  * runs dhcp server downstream
-  * uses border-rtr's dns server
+   * runs dhcp server downstream
+   * uses border-rtr's dns server
  * [ingest-rtr](configs/ingest-rtr/setup.sh):
-  * runs pimwatch.py, the DRIAD implementation hack (launches docker containers based on PIM packets it sees)
+   * runs pimwatch.py, the DRIAD implementation hack (launches docker containers based on PIM packets it sees)
 
 ## Interface Setup
 
