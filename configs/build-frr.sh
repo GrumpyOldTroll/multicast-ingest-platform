@@ -53,10 +53,12 @@ if ! dpkg --list libyang-dev; then
 fi
 
 if [ ! -d frr ]; then
-  git clone https://github.com/GrumpyOldTroll/frr
-  git -C frr checkout tags/frr-7.1-dev
+  git clone https://github.com/FRRouting/frr
+  # My local patches are no longer necessary on branches that include:
+  # https://github.com/FRRouting/frr/pull/3863
+  # git -C frr checkout tags/frr-7.1-dev
   # patch -p1 -d frr/ -i ../../../jake2.patch --ignore-whitespace
-  patch -p1 -d frr/ -i ../../../jake3.patch --ignore-whitespace
+  # patch -p1 -d frr/ -i ../../../jake3.patch --ignore-whitespace
 fi
 cd frr
 
