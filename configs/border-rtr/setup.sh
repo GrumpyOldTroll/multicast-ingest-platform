@@ -95,7 +95,7 @@ chown -R frr:frr /etc/frr
 if [ -f frr/tools/etc/default/frr ]; then
   cp frr/tools/etc/default/frr /etc/default/frr
 fi
-cp frr/redhat/frr.service /lib/systemd/system/frr.service
+cp frr/tools/frr.service /lib/systemd/system/frr.service
 systemctl enable frr.service
 systemctl daemon-reload
 EOF

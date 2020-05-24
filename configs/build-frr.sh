@@ -16,6 +16,7 @@ apt-get install -y \
   libatomic-ops-dev \
   libattr1-dev \
   libc-ares-dev \
+  libcap-dev \
   libgdbm-dev \
   libgmp-dev \
   libjson-c-dev \
@@ -59,6 +60,7 @@ if [ ! -d frr ]; then
   # git -C frr checkout tags/frr-7.1-dev
   # patch -p1 -d frr/ -i ../../../jake2.patch --ignore-whitespace
   # patch -p1 -d frr/ -i ../../../jake3.patch --ignore-whitespace
+  git -C frr checkout tags/frr-7.3.1
 fi
 cd frr
 
@@ -70,6 +72,7 @@ commit=$(printf '%u\n' 0x$c)
   --enable-numeric-version \
   --enable-exampledir=/tmp \
   --enable-systemd \
+  --enable-vtysh \
   --disable-doc \
   --prefix=/usr \
   --localstatedir=/var/run/frr \
