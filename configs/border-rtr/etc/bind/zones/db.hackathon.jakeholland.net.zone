@@ -1,5 +1,5 @@
 hackathon.jakeholland.net. IN SOA ns1.hackathon.jakeholland.net. jakeholland.net.gmail.com (
-                                 21     ; SERIAL
+                                 23     ; SERIAL
                                  7200   ; REFRESH
                                  600    ; RETRY
                                  120    ; EXPIRE
@@ -15,8 +15,10 @@ msrc4 IN A 23.212.185.4
 msrc5 IN A 23.212.185.5
 noaasrc IN A 131.128.93.40
 nsfsrc IN A 129.174.131.51
+kanrensrc IN A 162.250.138.201
 
 border-rtr IN A 10.8.1.1
+boring-rtr IN A 10.8.1.1
 ingest-rtr IN A 10.9.1.2
 access-rtr IN A 10.8.1.2
 

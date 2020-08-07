@@ -1,5 +1,5 @@
 40.93.128.131.in-addr.arpa. IN SOA ns1.hackathon.jakeholland.net. jakeholland.net.gmail.com (
-                                 22     ; SERIAL
+                                 23     ; SERIAL
                                  7200   ; REFRESH
                                  600    ; RETRY
                                  120    ; EXPIRE
@@ -9,17 +9,17 @@
 
 $ORIGIN 40.93.128.131.in-addr.arpa.
   IN	PTR	noaasrc.hackathon.jakeholland.net.
-; IN AMTRELAY 128 0 1 162.250.137.254
-; IN AMTRELAY 128 0 1 198.38.23.145
 
-  IN TYPE260 \# ( 6 ; length
-    10 ; precedence
-    01 ; D=0, relay type=1
-    a2fa89fe ) ; 162.250.137.254
+  ; IN AMTRELAY 16 0 3 amt-relay.m2icast.net.
+  IN TYPE260 \# ( 25 10 03 09616d742d72656c6179076d326963617374036e657400 )
 
-  IN TYPE260 \# ( 6 ; length
-    10 ; precedence
-    01 ; D=0, relay type=1
-    c6261791 ) ; 198.38.23.145
-
+  ; these are redundant with amt-relay.m2icast.net. in August 2020:
+  ; IN AMTRELAY 32 0 1 69.77.14.145
+  ;IN TYPE260 \# ( 6 20 01 454d0e91 )
+  ; IN AMTRELAY 32 0 1 162.250.137.254
+  ;IN TYPE260 \# ( 6 20 01 a2fa89fe )
+  ; IN AMTRELAY 32 0 1 198.38.23.145
+  ;IN TYPE260 \# ( 6 20 01 c6261791 )
+  ; IN AMTRELAY 32 0 1 162.250.136.101
+  ;IN TYPE260 \# ( 6 20 01 a2fa8865 )
 
