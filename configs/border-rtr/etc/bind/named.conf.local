@@ -15,13 +15,12 @@ zone "hackathon.jakeholland.net" {
     file "/etc/bind/zones/db.hackathon.jakeholland.net.zone";
 };
 
-# this zone has a globally deployed config as of Feb 2019
-#zone "185.212.23.in-addr.arpa" {
-#    # source ips for akamai multicast traffic (sender embedded behind relays)
-#    # udp://23.212.185.4@232.10.10.2:12000
-#    type master;
-#    file "/etc/bind/zones/reverse.185.212.23.in-addr.arpa.zone";
-#};
+zone "201.138.250.162.in-addr.arpa" {
+    # source IPs for KanREN multicast traffic
+    # udp://162.250.138.201@232.162.250.138:1234
+    type master;
+    file "/etc/bind/zones/reverse.201.138.250.162.in-addr.arpa.zone";
+};
 
 zone "51.131.174.129.in-addr.arpa" {
     # source for nsf knowledge network video native multicasting on internet2
@@ -36,3 +35,24 @@ zone "40.93.128.131.in-addr.arpa" {
     type master;
     file "/etc/bind/zones/reverse.40.93.128.131.in-addr.arpa.zone";
 };
+
+# this zone has a globally deployed config as of Feb 2019
+#zone "185.212.23.in-addr.arpa" {
+#    # source ips for akamai multicast traffic (sender embedded behind relays)
+#    # udp://23.212.185.4@232.10.10.2:12000
+#    type master;
+#    file "/etc/bind/zones/reverse.185.212.23.in-addr.arpa.zone";
+#};
+
+# this zone also has a globally deployed config
+#zone "0.0.0.0.0.e.4.1.0.0.6.2.ip6.arpa" {
+#    # source ips for akamai multicast traffic (sender embedded behind relays)
+#    # udp://23.212.185.4@232.10.10.2:12000
+#    type master;
+#    file "/etc/bind/zones/reverse.0.0.0.0.0.e.4.1.0.0.6.2.ip6.arpa.zone";
+#};
+
+#zone "driad.akastream2.com" {
+#    type master;
+#    file "/etc/bind/zones/db.driad.akastream2.com.zone";
+#};
