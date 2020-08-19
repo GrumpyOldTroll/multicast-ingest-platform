@@ -39,12 +39,31 @@ if [ "$did_netplan" = "1" ]; then
   sudo netplan apply
 fi
 
-../build-frr.sh
-
 sudo bash -x -e <<EOF
-# set up forwarding and frr
-echo "net.ipv4.ip_forward=1" | tee -a /etc/sysctl.conf
-sysctl -w net.ipv4.ip_forward=1
+# journalctl proved annoyingly large by default
+cp -r etc/systemd/journald.conf.d /etc/systemd/
+
+/usr/bin/snap install docker
+
+#curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+#add-apt-repository \
+#   "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+#   $(lsb_release -cs) \
+#   stable"
+#apt-get update
+#apt-get install -y docker-ce docker-ce-cli containerd.io
+
+# none of the permissions work for non-root anymore along 3 different
+# approaches --jake 2020-08
+
+#addgroup --system docker
+#adduser $USER docker
+#newgrp docker
+
+#groupadd docker
+#usermod -aG docker $USER
+
+#setfacl -m user:${USER}:rw /var/run/docker.sock
 
 # keep the dummy interface "dum0" up:
 cp lib/systemd/system/dummysource.service /lib/systemd/system/
@@ -58,35 +77,9 @@ cp lib/systemd/system/pimwatch.service /lib/systemd/system/
 systemctl enable pimwatch.service
 systemctl daemon-reload
 systemctl start pimwatch.service
-
-/usr/bin/snap install docker
-groupadd docker
-usermod -aG docker $USER
-
-( addgroup --system --gid 92 frr && \
-  addgroup --system --gid 85 frrvty && \
-  adduser --system --ingroup frr --home /var/opt/frr/ \
-     --gecos "FRR suite" --shell /bin/false frr && \
-     usermod -a -G frrvty frr ) \
-  || echo "frr already set up?"
-
-mkdir -p /var/run/frr && chown frr:frr /var/run/frr
-mkdir -p /var/log/frr && chown frr:frr /var/log/frr
-mkdir -p /etc/frr
-rsync -crvz etc/frr/ /etc/frr/
-chown -R frr:frr /etc/frr
-
-if [ -f frr/tools/etc/default/frr ]; then
-  cp frr/tools/etc/default/frr /etc/default/frr
-fi
-cp frr/redhat/frr.service /lib/systemd/system/frr.service
-systemctl enable frr.service
-systemctl daemon-reload
 EOF
 
-# Note: this network name MUST be alphabetically later than "bridge", or
-# something about docker startup gets confused in an unfortunate way.  YMMV
-docker network create --driver macvlan --subnet=10.9.1.0/24 --ip-range=10.9.1.64/26 --gateway=10.9.1.1 -o parent=irf0 xamtbr0
+../build-frr.sh
 
 ip link show
 echo "-------------"

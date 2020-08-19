@@ -1,0 +1,13 @@
+/var/log/frr/pimd.log
+/var/log/frr/ospfd.log
+/var/log/frr/staticd.log
+/var/log/frr/zebra.log
+{
+	rotate 5
+	size 1M
+	missingok
+	notifempty
+	delaycompress
+	compress
+	endscript
+}

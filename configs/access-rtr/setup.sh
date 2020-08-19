@@ -42,39 +42,18 @@ if [ "$did_netplan" = "1" ]; then
   sudo netplan apply
 fi
 
-../build-frr.sh
-
 sudo bash -x -e <<EOF
+# journalctl proved annoyingly large by default
+cp -r etc/systemd/journald.conf.d /etc/systemd/
+
 # dhcp for downstream
 apt install -y isc-dhcp-server
 cp etc/dhcp/dhcpd.conf /etc/dhcp/
 systemctl enable isc-dhcp-server.service
 systemctl restart isc-dhcp-server.service
-
-# set up forwarding and frr
-echo "net.ipv4.ip_forward=1" | tee -a /etc/sysctl.conf
-sysctl -w net.ipv4.ip_forward=1
-
-( addgroup --system --gid 92 frr && \
-  addgroup --system --gid 85 frrvty && \
-  adduser --system --ingroup frr --home /var/opt/frr/ \
-     --gecos "FRR suite" --shell /bin/false frr && \
-     usermod -a -G frrvty frr ) \
-  || echo "frr already set up?"
-
-mkdir -p /var/run/frr && chown frr:frr /var/run/frr
-mkdir -p /var/log/frr && chown frr:frr /var/log/frr
-mkdir -p /etc/frr
-rsync -crvz etc/frr/ /etc/frr/
-chown -R frr:frr /etc/frr
-
-if [ -f frr/tools/etc/default/frr ]; then
-  cp frr/tools/etc/default/frr /etc/default/frr
-fi
-cp frr/redhat/frr.service /lib/systemd/system/frr.service
-systemctl enable frr.service
-systemctl daemon-reload
 EOF
+
+../build-frr.sh
 
 ip link show
 echo "-------------"

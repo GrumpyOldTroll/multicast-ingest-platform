@@ -49,6 +49,9 @@ fi
 
 sudo bash -x -e <<EOF
 
+# journalctl proved annoyingly large by default
+cp -r etc/systemd/journald.conf.d /etc/systemd/
+
 # set up dns server
 apt install -y bind9 bind9utils bind9-doc
 cp etc/bind/named.conf.options /etc/bind/
@@ -73,30 +76,6 @@ systemctl restart isc-dhcp-server.service
 # upstream nat
 cp lib/systemd/system/border-fwd.service /lib/systemd/system/border-fwd.service
 systemctl enable border-fwd
-systemctl daemon-reload
-
-# set up forwarding and frr
-echo "net.ipv4.ip_forward=1" | tee -a /etc/sysctl.conf
-sysctl -w net.ipv4.ip_forward=1
-
-( addgroup --system --gid 92 frr && \
-  addgroup --system --gid 85 frrvty && \
-  adduser --system --ingroup frr --home /var/opt/frr/ \
-     --gecos "FRR suite" --shell /bin/false frr && \
-     usermod -a -G frrvty frr ) \
-  || echo "frr already set up?"
-
-mkdir -p /var/run/frr && chown frr:frr /var/run/frr
-mkdir -p /var/log/frr && chown frr:frr /var/log/frr
-mkdir -p /etc/frr
-rsync -crvz etc/frr/ /etc/frr/
-chown -R frr:frr /etc/frr
-
-if [ -f frr/tools/etc/default/frr ]; then
-  cp frr/tools/etc/default/frr /etc/default/frr
-fi
-cp frr/tools/frr.service /lib/systemd/system/frr.service
-systemctl enable frr.service
 systemctl daemon-reload
 EOF
 

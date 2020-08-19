@@ -287,6 +287,8 @@ $ dig +noall +answer +nocomments -t TYPE260 5.185.212.23.in-addr.arpa
                         if idx + hoplen > len(bin_content) or hoplen < 0:
                             logger.error('bad wire-encoded dns name (hoplen=%d at %d with %d left, so far name="%s"):\n%s\n%s' % (hoplen, idx, len(bin_content)-idx, name, content, '  '*idx + '^'))
                             return None
+                        if hoplen == 0:
+                            break
                         name += bin_content[idx:idx + hoplen].decode() + '.'
                         idx += hoplen
                     val = name
@@ -347,6 +349,9 @@ class AMTGateway(object):
         return 'gw(%s):%d' % (self.relay_ip, len(self.live_sgs))
 
 class ChannelManager(object):
+
+    dkr = '/snap/bin/docker'
+
     def __init__(self, ifname):
         self.ifname = ifname
         self.live_sgs = {}  # (src_ip,grp_ip) -> LiveSG
@@ -369,13 +374,24 @@ pimwatch-join-23.212.185.5-232.1.1.1
 pimwatch-gw-18.144.22.247
 ingest-frr
         '''
-        cmd = ['/snap/bin/docker', 'container', 'ls', '--format={{.Names}}']
-        dock_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-        out, err = dock_p.communicate(cmd)
-        retcode = dock_p.wait()
-        if retcode != 0:
-            logger.warning('return code %d from %s, out="%s", err="%s"' % (retcode, cmd, out, err))
-            return
+        # at startup, give docker service some time to start
+        retries = 0
+        while True:
+            cmd = [ChannelManager.dkr, 'container', 'ls', '--format={{.Names}}']
+            dock_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+            out, err = dock_p.communicate(cmd)
+            retcode = dock_p.wait()
+            if retcode == 0:
+                if retries != 0:
+                    logger.info('(retry successful)')
+                break
+
+            retries += 1
+            if retries > 5:
+                logger.warning('(retries exceeded): return code %d from %s, out="%s", err="%s"' % (retcode, cmd, out.strip(), err.strip()))
+                return
+            logger.info('(retry in 1s) return code %d from %s, out="%s", err="%s"' % (retcode, cmd, out.strip(), err.strip()))
+            time.sleep(1)
 
         if err:
             logger.warning('stderr output from %s: "%s"' % (cmd, err))
@@ -384,7 +400,7 @@ ingest-frr
             if line.startswith('pimwatch-'):
                 logger.warning('shutting down pre-existing pimwatch container %s' % line)
 
-                cmd = ['/snap/bin/docker', 'stop', line.strip()]
+                cmd = [ChannelManager.dkr, 'stop', line.strip()]
                 dock_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
                 out, err = dock_p.communicate(cmd)
                 retcode = dock_p.wait()
@@ -394,6 +410,23 @@ ingest-frr
 
                 if err:
                     logger.warning('stderr output from %s: "%s"' % (cmd, err))
+
+# Note: this network name MUST be alphabetically later than "bridge", or
+# something about docker startup gets confused in an unfortunate way.  YMMV
+#docker network create --driver macvlan --subnet=10.9.1.0/24 --ip-range=10.9.1.64/26 --gateway=10.9.1.1 -o parent=irf0 xamtbr0
+        cmd = [ChannelManager.dkr, 'network', 'inspect', 'xamtbr0']
+        dock_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        out, err = dock_p.communicate(cmd)
+        retcode = dock_p.wait()
+        if retcode != 0:
+            logger.info('no xamtbr0 detected, creating network')
+            cmd = [ChannelManager.dkr, 'network', 'create', '--driver', 'macvlan', '--subnet=10.9.1.0/24', '--ip-range=10.9.1.64/26', '--gateway=10.9.1.1', '-o', 'parent=irf0', 'xamtbr0']
+            dock_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+            out, err = dock_p.communicate(cmd)
+            retcode = dock_p.wait()
+            if retcode != 0:
+                logger.warning('return code %d from %s, out="%s", err="%s"' % (retcode, cmd, out, err))
+                return
 
     def pick_relay_for_source(self, options):
         if not options:
@@ -492,11 +525,10 @@ ingest-frr
         global logger
         logger.info('launching gateway to relay %s' % (relay_ip,))
 
-        dkr = '/snap/bin/docker'
         nwname = 'xamtbr0'
         contname = 'pimwatch-gw-%s' % (relay_ip.exploded)
         imagename = 'grumpyoldtroll/amtgw:latest'
-        cmd = [dkr, 'create', '--rm', '--name', contname, '--privileged', imagename, str(relay_ip)]
+        cmd = [ChannelManager.dkr, 'create', '--rm', '--name', contname, '--privileged', imagename, str(relay_ip)]
         logger.info('running: %s' % (' '.join(cmd)))
         launch_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         out, err = launch_p.communicate(cmd)
@@ -505,27 +537,27 @@ ingest-frr
             logger.error('return code %s from %s, out="%s", err="%s", failed gw launch' % (retcode, cmd, out, err))
             return None
 
-        cmd = [dkr, 'network', 'connect', nwname, contname]
+        cmd = [ChannelManager.dkr, 'network', 'connect', nwname, contname]
         logger.info('running: %s' % (' '.join(cmd)))
         connect_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         out, err = connect_p.communicate(cmd)
         retcode = connect_p.wait()
         if retcode != 0:
             logger.error('return code %s from %s, out="%s", err="%s", failed gw connect' % (retcode, cmd, out, err))
-            cmd = [dkr, 'container', 'stop', contname]
+            cmd = [ChannelManager.dkr, 'container', 'stop', contname]
             stopret = subprocess.run(cmd)
             logger.warning('stopped container: %s' % (stopret))
             return None
 
         time.sleep(1)
-        cmd = [dkr, 'start', contname]
+        cmd = [ChannelManager.dkr, 'start', contname]
         logger.info('running: %s' % (' '.join(cmd)))
         start_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         out, err = start_p.communicate(cmd)
         retcode = start_p.wait()
         if retcode != 0:
             logger.error('return code %s from %s, out="%s", err="%s", failed gw start' % (retcode, cmd, out, err))
-            cmd = [dkr, 'container', 'stop', contname]
+            cmd = [ChannelManager.dkr, 'container', 'stop', contname]
             stopret = subprocess.run(cmd)
             logger.warning('stopped container: %s' % (stopret))
             return None
@@ -546,7 +578,6 @@ ingest-frr
 
         source = ipaddress.ip_address(source)
         group = ipaddress.ip_address(group)
-        dkr = '/snap/bin/docker'
         nwname = 'xamtbr0'
         contname = 'pimwatch-join-%s-%s' % (source.exploded, group.exploded)
         imagename = 'grumpyoldtroll/iperf-ssm:latest'
@@ -554,7 +585,7 @@ ingest-frr
         # TBD: iperf-ssm is overkill and cruelly doomed to wait (or worse,
         # catch packets if they go to the right port). all i need is a
         # program that stays joined in the gateway's data network.
-        cmd = [dkr, 'run', '-d', '--network', nwname, '--rm', '--name', contname, imagename, '--server', '--udp', '--bind', str(group), '--source', str(source), '--interval', '1', '--len', '1500', '--interface', 'eth0']
+        cmd = [ChannelManager.dkr, 'run', '-d', '--network', nwname, '--rm', '--name', contname, imagename, '--server', '--udp', '--bind', str(group), '--source', str(source), '--interval', '1', '--len', '1500', '--interface', 'eth0']
         launch_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         out, err = launch_p.communicate(cmd)
         retcode = launch_p.wait()
@@ -568,10 +599,9 @@ ingest-frr
 
     def stop_gw(self, gw):
         global logger
-        dkr = '/snap/bin/docker'
 
         logger.info('stopping gw %s' % gw)
-        cmd = [dkr, 'container', 'stop', gw.contname]
+        cmd = [ChannelManager.dkr, 'container', 'stop', gw.contname]
         stopret = subprocess.run(cmd)
         logger.info('stopped container: %s' % (stopret))
 
@@ -579,10 +609,9 @@ ingest-frr
 
     def stop_sg(self, sg):
         global logger
-        dkr = '/snap/bin/docker'
 
         logger.info('stopping sg %s' % sg)
-        cmd = [dkr, 'container', 'stop', sg.contname]
+        cmd = [ChannelManager.dkr, 'container', 'stop', sg.contname]
         stopret = subprocess.run(cmd)
         logger.info('stopped container: %s' % (stopret))
 

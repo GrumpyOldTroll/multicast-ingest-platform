@@ -3,6 +3,11 @@ Description=Pimwatch
 Wants=network-online.target
 Requires=systemd-networkd.socket
 After=systemd-networkd.socket
+# is there a way to pick the one I've got?
+#Wants=docker.service
+#After=docker.service
+Wants=snap.docker.dockerd.service
+After=snap.docker.dockerd.service
 
 [Service]
 Type=simple
