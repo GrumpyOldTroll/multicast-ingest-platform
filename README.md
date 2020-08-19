@@ -30,6 +30,8 @@ The devices I've used so far for the multicast ingest platform and its supportin
 
 ![Routers](hackathon103-routers.jpg)
 
+In August of 2020, that meant the [GUZILA Fanless Mini PC](https://www.amazon.com/gp/product/B07D9YX3W6), along with 3 [Ethernet-to-USB](https://www.amazon.com/gp/product/B083W4YVX8) adapters (two for the border-rtr, one for the access-rtr), plus 4 ethernet cables and a switch downstream of the access-rtr, plus whatever you need to connect your receivers (or the wifi router(s) your receivers will connect to) to that switch.
+
 The devices started this life as a default install of [Ubuntu Server 18.04](https://www.ubuntu.com/download/server).  You can stick with the defaults, or select the "docker" snap (or not--it'll be installed by the setup script on ingest-rtr).
 
 ![Base Install](base-install-options-screen.jpg)
@@ -48,19 +50,23 @@ Normal lab machine setup:
 
  * add your keys and `chmod 0600 .ssh/authorized_keys`, if desired; maybe visudo to add `user ALL=NOPASSWD: ALL` at the end if you're crazy and/or well-isolated.
 
- * catch up your updates
+ * catch up your updates ([with thanks](https://serverfault.com/a/858361))
  * prevent your drive from filling up with old kernels over time, since updates are for some reason auto-downloaded but not auto-cleaned by default:
  * restart
 
-	~~~
-	sudo bash -x -e <<EOF
-	apt update
-	apt dist-upgrade -y
-	apt autoremove -y
-	echo 'Unattended-Upgrade::Remove-Unused-Dependencies "true";' | \
-	   tee -a /etc/apt/apt.conf.d/50unattended-upgrades 
-	EOF
-	~~~
+   ~~~
+sudo bash -x -e <<EOF
+export DEBIAN_FRONTEND=noninteractive
+export APT_LISTCHANGES_FRONTEND=none
+echo 'libc6 libraries/restart-without-asking boolean true' | debconf-set-selections
+apt-get update
+apt-get --allow-downgrades --allow-remove-essential --allow-change-held-packages -o Dpkg::Options::="--force-confold" --force-yes -o Dpkg::Options::="--force-confdef" -fuy dist-upgrade
+apt-get -y autoremove
+echo 'Unattended-Upgrade::Remove-Unused-Dependencies "true";' | \
+  sudo tee -a /etc/apt/apt.conf.d/50unattended-upgrades
+reboot
+EOF
+   ~~~
 
 ## Setup Scripts
 
@@ -83,7 +89,11 @@ After a successful install, it should be possible to reboot and come back up gra
 
 For ease of config, I've got dhcp client on for ingest-rtr and access-rtr running on the upstream interface, so it still should work ok after configuring it, whether or not you're running through the border-rtr and have the topology set up, in theory.
 
-Check the scripts for details.  In all 3 cases, it builds frr locally from source and installs it, and turns on ip forwarding.  Extra details:
+Check the scripts for details.  In all 3 cases, it builds frr locally from source and installs it, and turns on ip forwarding.
+
+If you're using USB-to-Ethernet adapters, you'll need them plugged for this stage (or it gives an early error for not having enough interfaces).  The config will incorporate the MAC of the chosen adapter, so if you shuffle them later you'll need to update the config like the "Interface Setup" section below describes.
+
+Extra details:
 
  * [border-rtr](configs/border-rtr/setup.sh):
    * runs dhcp client upstream
