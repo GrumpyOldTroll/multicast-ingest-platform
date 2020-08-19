@@ -54,19 +54,19 @@ Normal lab machine setup:
  * prevent your drive from filling up with old kernels over time, since updates are for some reason auto-downloaded but not auto-cleaned by default:
  * restart
 
-   ~~~
-sudo bash -x -e <<EOF
-export DEBIAN_FRONTEND=noninteractive
-export APT_LISTCHANGES_FRONTEND=none
-echo 'libc6 libraries/restart-without-asking boolean true' | debconf-set-selections
-apt-get update
-apt-get --allow-downgrades --allow-remove-essential --allow-change-held-packages -o Dpkg::Options::="--force-confold" --force-yes -o Dpkg::Options::="--force-confdef" -fuy dist-upgrade
-apt-get -y autoremove
-echo 'Unattended-Upgrade::Remove-Unused-Dependencies "true";' | \
-  sudo tee -a /etc/apt/apt.conf.d/50unattended-upgrades
-reboot
-EOF
-   ~~~
+  ~~~
+  sudo bash -x -e <<EOF
+  export DEBIAN_FRONTEND=noninteractive
+  export APT_LISTCHANGES_FRONTEND=none
+  echo 'libc6 libraries/restart-without-asking boolean true' | debconf-set-selections
+  apt-get update
+  apt-get --allow-downgrades --allow-remove-essential --allow-change-held-packages -o Dpkg::Options::="--force-confold" --force-yes -o Dpkg::Options::="--force-confdef" -fuy dist-upgrade
+  apt-get -y autoremove
+  echo 'Unattended-Upgrade::Remove-Unused-Dependencies "true";' | \
+    sudo tee -a /etc/apt/apt.conf.d/50unattended-upgrades
+  reboot
+  EOF
+  ~~~
 
 ## Setup Scripts
 
