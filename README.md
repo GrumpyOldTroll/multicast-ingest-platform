@@ -25,11 +25,11 @@ for multicast from different sources--anyone who sets up the right
 AMTRELAY DNS record in the DNS reverse IP tree for their source's IP
 should be able to provide traffic to your network's clients.
 
-(NB: if you're using the <sample-network> setup, there is unfortunately a
-[route added](sample-network/border-rtr/etc/frr/staticd.conf) for the source
-as a workaround because FRR's MRIB does not yet work right.  We hope to
-also remove this restriction when we can get FRR's rpf fixed.  This
-source-specific configuration is not required for a Cisco- or Juniper-
+(NB: if you're using the [sample-network setup](sample-network), there is unfortunately a
+[route added](sample-network/border-rtr/etc/frr/staticd.conf#L12) for our known source IPs at present.
+This is a workaround because FRR's MRIB does not yet work right.  We hope to
+also remove this hacked static route when we can get FRR's rpf fixed.  This
+source-specific configuration should not be required for a Cisco- or Juniper-
 based network, because configuring a default route for the multicast
 routing table toward the ingest point works on those platforms.)
 
@@ -44,27 +44,27 @@ routing table toward the ingest point works on those platforms.)
 ## Installation
 
 There's 3 different kinds of docker containers that will be running:
- - the master ingest router.  Directly connected to the multicast network and running PIM.
- - a dummy upstream router.  (This is currently necessary as a workaround for another FRR bug, but again hopefully should be possible to remove one day.)
- - Potentially multiple AMT gateway containers launched by the ingest router
+ - the [master ingest router](https://hub.docker.com/r/grumpyoldtroll/ingest-rtr).  Directly connected to the multicast network and running PIM.
+ - a [dummy upstream router](https://hub.docker.com/r/grumpyoldtroll/pim-dummy-upstream).  (This is currently necessary as a workaround for another FRR bug, but again hopefully should be possible to remove one day.)
+ - Potentially multiple [AMT gateway](https://hub.docker.com/r/grumpyoldtroll/amtgw) containers that get launched by the ingest router
 
-You'll install the first 2 containers, and the master one will launch other
+You'll install the first 2 containers, and the ingest-rtr will launch other
 docker containers autonomously in response to PIM messages, in order to
-ingest traffic over AMT.
+ingest traffic over AMT and feed it as native multicast into your network.
 
 There's 3 docker network pieces to this setup:
- - mcast-out: the connection to the external multicast network.  (This name MAY be changed if you like.)
- - amt-bridge: the internal network that AMT gateways use to open the tunnels they establish to the outside.  This name MUST be "amt-bridge", it is directly used from inside the master.
- - mcast-xmit: the internal network where multicast comes out from the AMT gateways and gets forwarded to mcast-out.  This name MUST be "mcast-xmit", it is directly used from inside the master.  (If you change the source and thus change this name, it still MUST be alphabetically later than BOTH mcast-out and amt-bridge, due to a bug in docker: https://github.com/moby/moby/issues/25181)
+ - *mcast-out*: the connection to the external multicast network.  (This name MAY be changed if you like.)
+ - *amt-bridge*: the internal network that AMT gateways use to open the tunnels they establish to the outside.  This name MUST be "amt-bridge", it is directly used from inside the ingest-rtr.
+ - *mcast-xmit*: the internal network where multicast comes out from the AMT gateways and gets forwarded to mcast-out.  This name MUST be "mcast-xmit", it is directly used from inside the master.  (If you change the source and thus change this name, it still MUST be alphabetically later than BOTH mcast-out and amt-bridge, due to a bug in docker: https://github.com/moby/moby/issues/25181)
 
 ### Variables
 
 For convenience, the "Commands" section below uses these variables that should be configured based on your network the ingest device is plugging into:
 
-  - IFACE:  the physical interface on the host that you'll be plugging into your multicast network.  (I named mine irf for "ingest reflector", but it should match the name of the physical interface on your host machine.)
-  - PIMD: the IP address for this ingest device within your multicast network. You may set it to match your interface's IP, or you can set it to a specific other IP value appropriate to your network. (The command below tries to extract it from the output of "ip addr show dev $IFACE)
-  - GATEWAY: the IP address of the gateway for the ingest device's connection within your multicast network.  This should be the next hop toward a default route out that interface.
-  - SUBNET: the subnet for PIMD and GATEWAY
+  - *IFACE*:  the physical interface on the host that you'll be plugging into your multicast network.  (I named mine irf for "ingest reflector", but it should match the name of the physical interface on your host machine.)
+  - *PIMD*: the IP address for this ingest device within your multicast network. You may set it to match your interface's IP, or you can set it to a specific other IP value appropriate to your network. (The command below tries to extract it from the output of "ip addr show dev $IFACE)
+  - *GATEWAY*: the IP address of the gateway for the ingest device's connection within your multicast network.  This should be the next hop toward a default route out that interface.
+  - *SUBNET*: the subnet for PIMD and GATEWAY
 
 ~~~
 IFACE=irf0
@@ -73,7 +73,9 @@ GATEWAY=10.9.1.1
 SUBNET=10.9.1.0/24
 
 # you MAY change these, but shouldn't need to.  This is the internal
-# network where the native multicast arrives unwrapped from AMT.
+# network where the native multicast arrives unwrapped from AMT, and
+# these addresses never appear outside a virtual bridge internal to this
+# host.
 INTERNALNET=10.11.1.0/24
 INTERNALUPSTREAM=10.11.1.2
 
@@ -167,7 +169,7 @@ sudo docker logs -f ingest-rtr
 The proof of concept itself is just [pimwatch.py](src/pimwatch.py), which runs:
 
  * [tcpdump](https://manpages.debian.org/stretch/tcpdump/tcpdump.8.en.html) to watch [PIM](https://tools.ietf.org/html/rfc7761) packets.
- * [dig](https://manpages.debian.org/stretch/dnsutils/dig.1.en.html) for DRIAD's [DNS querying](https://tools.ietf.org/html/draft-ietf-mboned-driad-amt-discovery-01#section-2.2)
+ * [dig](https://manpages.debian.org/stretch/dnsutils/dig.1.en.html) for DRIAD's [DNS querying](https://tools.ietf.org/html/rfc8777#section-2.2)
  * an [amtgw](https://hub.docker.com/r/grumpyoldtroll/amtgw) docker container to establish tunnels, and
  * an "ip igmp join" command in frr to send a join/leave through the tunnel.
 
