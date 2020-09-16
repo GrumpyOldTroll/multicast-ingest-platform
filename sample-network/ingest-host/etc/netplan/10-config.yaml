@@ -1,0 +1,12 @@
+network:
+  ethernets:
+    enp1s0:
+      dhcp4: true
+    irf0:
+      dhcp4: false
+      optional: true
+      addresses: [10.9.1.2/24]
+      match:
+        macaddress: c8:b3:73:0f:30:92
+      set-name: irf0
+  version: 2
