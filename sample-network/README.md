@@ -25,15 +25,28 @@ The devices I've used so far for the multicast ingest platform and its supportin
 
 ![Routers](pics/hackathon103-routers.jpg)
 
-In August of 2020, that meant the [GUZILA Fanless Mini PC](https://www.amazon.com/gp/product/B07D9YX3W6), along with 3 [Ethernet-to-USB](https://www.amazon.com/gp/product/B083W4YVX8) adapters (two for the border-rtr, one for the access-rtr), plus 4 ethernet cables and a switch downstream of the access-rtr, plus whatever you need to connect your receivers (or the wifi router(s) your receivers will connect to) to that switch.
+There's a few different devices I've used for different builds of this network, including:
 
-The devices started this life as a default install of [Ubuntu Server 18.04](https://www.ubuntu.com/download/server).  You can stick with the defaults, or select the "docker" snap (or not--it'll be installed by the setup script on ingest-rtr).
+ * [Zotac CI329 nano](https://www.zotac.com/us/product/mini_pcs/zbox-ci329-nano-windows-10-s-mode) (pictured)
+ * [Minisforum Z83-F](https://store.minisforum.com/products/minisforum-z83-f-mini-pc)
+ * [GUZILA Fanless Mini PC](https://www.amazon.com/gp/product/B07D9YX3W6)
+   (This worked but is tight as the border-rtr because you use both USB ports for ethernet, so you can't also use a keyboard)
+
+You'll need 2 of these (for the border-rtr and the access-rtr) plus another for your [ingest-rtr](../README.md) if you're using the same platform.
+
+You'll need for your border-rtr to have 3 ethernet interfaces and your access-rtr to have 2, so for the minisforum or guzila you'll need an extra 3 [Ethernet-to-USB](https://www.amazon.com/gp/product/B083W4YVX8) adapters, or just 1 for the zotac since it has 2 ethernet ports built in.
+
+Depending what kinds of receivers you'll be connecting, you'll also probably want an [ethernet switch](https://www.netgear.com/home/products/networking/switches/soho-ethernet-switches/gs305v3.aspx#tab-techspecs) to connect them, or possibly a wi-fi router.
+
+If you use a wi-fi router, you'll need one that does [IGMP Proxying](https://tools.ietf.org/html/rfc4605).  I know the [Fritz!Box](https://en.avm.de/products/fritzbox/) and the [Nighthawk](https://kb.netgear.com/24085/How-do-I-view-the-WAN-settings-on-my-Nighthawk-router) include IGMP proxying support, and I also know [OpenWRT](https://openwrt.org/packages/start) with the mcproxy package installed works.
+
+Anyway, these devices started this life as a default install of [Ubuntu Server 18.04](https://www.ubuntu.com/download/server).  You can stick with the defaults, or select the "docker" snap (or not--it'll be installed by the setup script on ingest-rtr).
 
 ![Base Install](pics/base-install-options-screen.jpg)
 
 I expect any setup suitable for FRRouting will work the same, but these instructions include all the commands and configs starting after completing this install and logging into the new machines.
 
-After that, [Free Range Routing](https://frrouting.org/) is launched, and the config in this repo is applied on 3 devices, to bring up this very simple lab network:
+After that, [Free Range Routing](https://frrouting.org/) is launched, and the config in this repo is applied on the border-rtr and the access-rtr (plus the ingest-rtr config), to bring up this very simple lab network:
 
 ![Lab Network](pics/lab-network.png)
 
@@ -49,7 +62,7 @@ Normal lab machine setup:
  * prevent your drive from filling up with old kernels over time, since updates are for some reason auto-downloaded but not auto-cleaned by default:
  * restart
 
-  ~~~
+  ~~~bash
   sudo bash -x -e <<EOF
   export DEBIAN_FRONTEND=noninteractive
   export APT_LISTCHANGES_FRONTEND=none
@@ -70,7 +83,7 @@ The basic process for each of the routers is the same, from the different direct
  * `border-rtr/`
  * `access-rtr/`
 
-~~~
+~~~bash
 git clone https://github.com/GrumpyOldTroll/multicast-ingest-platform.git
 cd multicast-ingest-platform/
 # either border-rtr, access-rtr, or ingest-rtr
@@ -83,7 +96,7 @@ After a successful install, it should be possible to reboot and come back up gra
 
 For ease of config, I've got dhcp client on for ingest-rtr and access-rtr running on the upstream interface, so it still should work ok after configuring it, whether or not you're running through the border-rtr and have the topology set up, in theory.
 
-Check the scripts for details.  In all 3 cases, it builds frr locally from source and installs it, and turns on ip forwarding.
+Check the scripts for details.  In both cases, it builds frr locally from source and installs it, and turns on ip forwarding.
 
 If you're using USB-to-Ethernet adapters, you'll need them plugged for this stage (or it gives an early error for not having enough interfaces).  The config will incorporate the MAC of the chosen adapter, so if you shuffle them later you'll need to update the config like the "Interface Setup" section below describes.
 
@@ -137,7 +150,7 @@ This is an example of what one of the udev rules might look like.
 
 Remember to use your own mac addresses.
 
-~~~
+~~~bash
 # /etc/udev/rules.d/10-border-rtr-inames.rules
 # upstream, to internet
 SUBSYSTEM=="net", ACTION=="add", DRIVERS=="?*", ATTR{address}=="00:e0:4c:c1:55:1e", NAME="bup0"
@@ -182,7 +195,7 @@ Once it's all set up, you should be able to plug in a client downstream of the a
 
 For example, this should work if you've got docker and my sender is still alive and properly configured (you get about 1 packet per second, and it's a good way to watch the pcaps from various points on the network):
 
-~~~
+~~~bash
 docker run -it --rm --name rx2 grumpyoldtroll/iperf-ssm:latest --server --udp --bind 232.10.1.1 --source 23.212.185.5 --interval 1 --len 1500 --interface eth0
 ~~~
 
@@ -190,7 +203,7 @@ The frr config is in /etc/frr/.
 
 The running frr process is basically sort-of like a Cisco IOS command line with slightly different commands, if you run vtysh to connect to it:
 
-~~~
+~~~bash
 sudo /usr/bin/vtysh
 border-rtr# show ip pim neighbor
 Interface         Neighbor    Uptime  Holdtime  DR Pri

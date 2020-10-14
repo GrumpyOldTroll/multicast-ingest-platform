@@ -53,20 +53,20 @@ docker containers autonomously in response to PIM messages, in order to
 ingest traffic over AMT and feed it as native multicast into your network.
 
 There's 3 docker network pieces to this setup:
- - *mcast-out*: the connection to the external multicast network.  (This name MAY be changed if you like.)
- - *amt-bridge*: the internal network that AMT gateways use to open the tunnels they establish to the outside.  This name MUST be "amt-bridge", it is directly used from inside the ingest-rtr.
- - *mcast-xmit*: the internal network where multicast comes out from the AMT gateways and gets forwarded to mcast-out.  This name MUST be "mcast-xmit", it is directly used from inside the master.  (If you change the source and thus change this name, it still MUST be alphabetically later than BOTH mcast-out and amt-bridge, due to a bug in docker: https://github.com/moby/moby/issues/25181)
+ - **mcast-out**: the connection to the external multicast network.  (This name MAY be changed if you like, but MUST be alphabetically earlier than mcast-xmit due to a [docker issue](https://github.com/moby/moby/issues/25181).)
+ - **amt-bridge**: the internal network that AMT gateways use to open the tunnels they establish to the outside.  This name MUST be "amt-bridge", it is directly used from inside the ingest-rtr.
+ - **mcast-xmit**: the internal network where multicast comes out from the AMT gateways and gets forwarded to mcast-out.  This name MUST be "mcast-xmit", it is directly used from inside the master.  (If you change the source and thus change this name, it still MUST be alphabetically later than BOTH mcast-out and amt-bridge, due to a [bug in docker](https://github.com/moby/moby/issues/25181))
 
 ### Variables
 
 For convenience, the "Commands" section below uses these variables that should be configured based on your network the ingest device is plugging into:
 
-  - *IFACE*:  the physical interface on the host that you'll be plugging into your multicast network.  (I named mine irf for "ingest reflector", but it should match the name of the physical interface on your host machine.)
-  - *PIMD*: the IP address for this ingest device within your multicast network. You may set it to match your interface's IP, or you can set it to a specific other IP value appropriate to your network. (The command below tries to extract it from the output of "ip addr show dev $IFACE)
-  - *GATEWAY*: the IP address of the gateway for the ingest device's connection within your multicast network.  This should be the next hop toward a default route out that interface.
-  - *SUBNET*: the subnet for PIMD and GATEWAY
+  - **IFACE**:  the physical interface on the host that you'll be plugging into your multicast network.  (I named mine irf for "ingest reflector", but it should match the name of the physical interface on your host machine.)
+  - **PIMD**: the IP address for this ingest device within your multicast network. You may set it to match your interface's IP, or you can set it to a specific other IP value appropriate to your network. (The command below tries to extract it from the output of "ip addr show dev $IFACE)
+  - **GATEWAY**: the IP address of the gateway for the ingest device's connection within your multicast network.  This should be the next hop toward a default route out that interface.
+  - **SUBNET**: the subnet for PIMD and GATEWAY
 
-~~~
+~~~bash
 IFACE=irf0
 PIMD=$(ip addr show dev ${IFACE} | grep "inet " | awk '{print $2;}' | cut -f1 -d/)
 GATEWAY=10.9.1.1
@@ -114,7 +114,7 @@ the internet with unicast from the host's IP (PIMD) on that link.
 
 You can do this with source routing through a separate table:
 
-~~~
+~~~bash
 # put the subnet of amt-bridge in AMTSRCNET:
 AMTSRCNET=$(sudo docker network inspect amt-bridge | grep Subnet | sed -e 's/ *"Subnet": "\(.*\)",/\1/')
 
@@ -139,7 +139,7 @@ sudo ip rule add from ${AMTSRCNET} table 10 priority 50
 
 Access to the containers underlying file system with bash:
 
-~~~
+~~~bash
 sudo docker exec -it ingest-rtr bash
 ~~~
 
@@ -147,7 +147,7 @@ There are logs in /var/log/frr/, and frr config files in /etc/frr/.
 
 Access to the router configuration with vtysh:
 
-~~~
+~~~bash
 sudo docker exec -it ingest-rtr vtysh
 ~~~
 
@@ -160,7 +160,7 @@ It's also often helpful to see what's happening in the ingest-rtr, there's
 logging that at least shows whether joins are reaching the router and
 what gateways are launched (also visible with "docker container ls"):
 
-~~~
+~~~bash
 sudo docker logs -f ingest-rtr
 ~~~
 
