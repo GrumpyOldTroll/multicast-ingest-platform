@@ -8,6 +8,13 @@ if [ -d /usr/lib/frr ]; then
   exit 0
 fi
 
+MAJ=$(lsb_release --release --short | cut -f1 -d.)
+if [ "$MAJ" -lt "20" ]; then
+	PYTHON2=python
+else
+	PYTHON2=python2
+fi
+
 sudo bash -x -e << EOF
 add-apt-repository universe
 
@@ -26,7 +33,7 @@ apt-get install -y \
   libjson-c-dev \
   libpcre3-dev \
   libprotobuf-c-dev \
-  libpython-dev \
+  lib${PYTHON2}-dev \
   libpam0g-dev \
   libsnmp-dev \
   libsystemd-dev \
@@ -35,7 +42,7 @@ apt-get install -y \
   libzmq5 \
   pkg-config \
   perl \
-  python \
+  ${PYTHON2} \
   python-ipaddress \
   python3-dev \
   python3-pytest \

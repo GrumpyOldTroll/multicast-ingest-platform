@@ -4,7 +4,7 @@ This is a guide for setting up an ingest platform to pull in multicast
 traffic originating outside your local network.
 
 At this stage only IPv4 is supported.  Once IPv6 is supported in
-[FRR](https://frrouting.org/)'s PIM implementation, we hope to upgrade this project to support
+[FRR](https://frrouting.org/)'s [PIM](https://tools.ietf.org/html/rfc7761) implementation, we hope to upgrade this project to support
 IPv6 as well.
 
 This is a [DRIAD](https://tools.ietf.org/html/rfc8777)-based proof of concept that responds to [SSM](https://tools.ietf.org/html/rfc4607) joins to externally-supplied (S,G)s by ingesting multicast traffic from outside the local network.  It works by discovering an AMT relay that's specific to the source of the (S,G).  It uses no explicit source-specific configuration, and has no explicit peering with the source's network.
@@ -62,15 +62,18 @@ There's 3 docker network pieces to this setup:
 For convenience, the "Commands" section below uses these variables that should be configured based on your network the ingest device is plugging into:
 
   - **IFACE**:  the physical interface on the host that you'll be plugging into your multicast network.  (I named mine irf for "ingest reflector", but it should match the name of the physical interface on your host machine.)
-  - **PIMD**: the IP address for this ingest device within your multicast network. You may set it to match your interface's IP, or you can set it to a specific other IP value appropriate to your network. (The command below tries to extract it from the output of "ip addr show dev $IFACE)
   - **GATEWAY**: the IP address of the gateway for the ingest device's connection within your multicast network.  This should be the next hop toward a default route out that interface.
   - **SUBNET**: the subnet for PIMD and GATEWAY
+  - **PIMD**: the IP address the PIM adjacency will use for connecting over IFACE, from inside the container.  If you are using IFACE for other traffic, this IP has to be different from the IP address for the host.  (There's a sample command below that tries to extract it from the output of "ip addr show dev $IFACE" and then add one.)
 
 ~~~bash
 IFACE=irf0
-PIMD=$(ip addr show dev ${IFACE} | grep "inet " | awk '{print $2;}' | cut -f1 -d/)
 GATEWAY=10.9.1.1
 SUBNET=10.9.1.0/24
+PIMD=10.9.1.3
+#pimbase=$(ip addr show dev ${IFACE} | grep "inet " | tail -n 1 | awk '{print $2;}' | cut -f1 -d/)
+#PIMD=$(python3 -c "from ipaddress import ip_address as ip; x=ip('${pimbase}'); print(ip(x.packed[:-1]+((x.packed[-1]+1)%256).to_bytes(1,'big')))")
+
 
 # you MAY change these, but shouldn't need to.  This is the internal
 # network where the native multicast arrives unwrapped from AMT, and
@@ -89,14 +92,14 @@ sudo docker network create --driver bridge --subnet=${INTERNALNET} mcast-xmit
 # create the upstream dummy neighbor
 sudo docker run -d --name upstream-dummy-nbr --restart=unless-stopped --privileged --network mcast-xmit --ip ${INTERNALUPSTREAM} grumpyoldtroll/pim-dummy-upstream:latest
 
+# to improve performance of the first join, pull the amtgw image:
+sudo docker pull grumpyoldtroll/amtgw:latest
+
 # create the master ingest router.  NB: This needs the docker socket
 # attached so it can launch new docker containers.
 sudo docker create --name ingest-rtr --restart=unless-stopped --privileged --network mcast-out --ip ${PIMD} -v /var/run/docker.sock:/var/run/docker.sock grumpyoldtroll/ingest-rtr:latest ${INTERNALUPSTREAM}
 sudo docker network connect mcast-xmit ingest-rtr
 sudo docker start ingest-rtr
-
-# to improve performance of the first join, pull the amtgw image:
-sudo docker pull grumpyoldtroll/amtgw:latest
 ~~~
 
 ### NATting AMT Traffic
@@ -174,4 +177,46 @@ The proof of concept itself is just [pimwatch.py](src/pimwatch.py), which runs:
  * an "ip igmp join" command in frr to send a join/leave through the tunnel.
 
 The rest of the setup is so that there are PIM packets for pimwatch.py to watch and respond to.
+
+# Resources
+
+I maintain a few live streams.  These may not remain up forever, so if they seem down, contact me and I can possibly launch them again or point you to an updated location.
+
+ * with [iperf-ssm](https://github.com/GrumpyOldTroll/iperf-ssm) (1kbps): iperf --server --udp --bind 232.1.1.1 --source 23.212.185.5 --interval 1 --len 1500 --interface en5
+ * with [vlc](https://www.videolan.org/index.html) (about 5mbps, streaming [blender project](https://www.blender.org/about/projects/) videos): vlc udp://23.212.185.5@232.10.10.2:12000
+
+Akamai also has some proprietary receivers and corresponding source streams that are under development.  [Contact me](mailto:jholland@akamai.com) if you would like to arrange to do some experiments or trials.
+
+## Internet2
+
+There are also a number of video streams active on [internet2](https://www.internet2.edu/) and reachable by some AMT relays.
+
+ * Lauren Delwiche wrote and maintains a [menu of content](https://multicastmenu.herokuapp.com/) app
+ * William Zhang has published a [scanning script](https://github.com/willzhang05/senior-research/blob/master/find_src_i2.py) to find live multicast streams by scraping the [Routing Table Proxy](https://routerproxy.wash2.net.internet2.edu/routerproxy/) published by [Indiana University](https://routerproxy.wash2.net.internet2.edu/).
+ * Lenny Giuliano maintains a "[MTTG](https://www.ietf.org/proceedings/104/slides/slides-104-mboned-mttg-01)" (Multicast to the Grandma) slack server where you can learn about all this and more.  If you'll be working in this space and you want to get in touch with the people driving this technology, contact me (open an issue if you like) and I can get you an invite.
+
+### AMT in VLC
+
+It should also be noted that VLC at version 4.02 and later contains an embedded AMT Gateway that can form a unicast tunnel to an AMT relay to directly ingest multicast traffic from an external network.  The urls beginning with "amt://" in the multicastmenu.herokuapp.com menu will ask VLC to connect this way, whereas "udp://" with the same addresses will only use native multicast.
+
+If as an end user you just want to view the content and you don't care about packet replication in the local network, it is possible to do so with just a recent VLC client, thanks to Natalie Landsberg and the work she did adding the embedded AMT Gateway capability to VLC, by using "amt://source@group:port".
+
+However, If you want to have in-network packet replication to gain the bandwidth benefits of multicast, this is not recommended because it will open a unicast tunnel from the app to the relay in Internet2, bypassing the use of multicast.
+
+If, as a network operator, you have many users doing this when you're providing native multicast reachability for traffic from those sources, it may become necessary to block port 2268 for your users or require them to use a VPN if they need to do this, if the practice of using amt: instead of udp: from within VLC becomes widespread.  However, at the time of this writing (late 2020) it's usually only a few people experimenting with multicast that do this, and can generally be ignored.
+
+### DNS Hacks to Ingest Traffic from Internet2
+
+Most of the content on Internet2 has not yet published resource records
+for [DRIAD](https://tools.ietf.org/html/rfc8777) to support dynamic AMT
+discovery at the time of this writing.
+
+However, for local experimentation it's possible to inject records into
+your own DNS server.  Thanks to Lenny Giuliano's leadership and Juniper's
+support, several public AMT relays are operational on Internet2, and can
+export content published to Internet2 with multicast.
+
+The [sample-network](sample-network) bind configuration contains [some](sample-network/border-rtr/etc/bind/zones/reverse.51.131.174.129.in-addr.arpa.zone#L15) [example](sample-network/border-rtr/etc/bind/zones/reverse.40.93.128.131.in-addr.arpa.zone#L14) [zones](sample-network/border-rtr/etc/bind/zones/reverse.201.138.250.162.in-addr.arpa.zone#L20) that map traffic from some of those source IPs on Internet2 (active at the time of this writing) to the amt-relay.m2icast.net domain name that the public AMT relays on Internet2 are using.
+
+Doing this enables ingest of that content via this ingest platform if those DNS records are seen by the ingest platform.  (Note that using these zones is a local hijack of the reverse-IP DNS records for those sources, and may locally suppress other records such as PTR lookups that are published to the global DNS by the actual controllers of those zones, and may not be suitable for some environments.)
 

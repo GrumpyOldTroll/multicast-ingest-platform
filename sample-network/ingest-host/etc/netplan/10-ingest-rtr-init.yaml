@@ -1,12 +1,11 @@
+# /etc/netplan/10-ingest-rtr-init.yaml
 network:
   ethernets:
-    enp1s0:
-      dhcp4: true
     irf0:
       dhcp4: false
+      gateway4: 10.9.1.1
       optional: true
       addresses: [10.9.1.2/24]
-      match:
-        macaddress: c8:b3:73:0f:30:92
-      set-name: irf0
+      nameservers:
+        addresses: [10.9.1.1]
   version: 2

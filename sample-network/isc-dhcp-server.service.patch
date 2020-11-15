@@ -1,0 +1,7 @@
+--- orig.isc-dhcp-server.service	2020-11-14 09:20:46.849178419 +0000
++++ isc-dhcp-server.service	2020-11-14 09:21:23.064844824 +0000
+@@ -11 +11,3 @@
+-[Service]
++[Service] 
++Restart=always
++RestartSec=3

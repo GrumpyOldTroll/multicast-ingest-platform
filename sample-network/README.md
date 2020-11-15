@@ -63,17 +63,23 @@ Normal lab machine setup:
  * restart
 
   ~~~bash
-  sudo bash -x -e <<EOF
-  export DEBIAN_FRONTEND=noninteractive
-  export APT_LISTCHANGES_FRONTEND=none
-  echo 'libc6 libraries/restart-without-asking boolean true' | debconf-set-selections
-  apt-get update
-  apt-get --allow-downgrades --allow-remove-essential --allow-change-held-packages -o Dpkg::Options::="--force-confold" --force-yes -o Dpkg::Options::="--force-confdef" -fuy dist-upgrade
-  apt-get -y autoremove
-  echo 'Unattended-Upgrade::Remove-Unused-Dependencies "true";' | \
-    sudo tee -a /etc/apt/apt.conf.d/50unattended-upgrades
-  reboot
-  EOF
+sudo bash -x -e <<EOF
+export DEBIAN_FRONTEND=noninteractive
+export APT_LISTCHANGES_FRONTEND=none
+echo 'libc6 libraries/restart-without-asking boolean true' | debconf-set-selections
+apt-get update
+apt-get --allow-downgrades --allow-remove-essential --allow-change-held-packages -o Dpkg::Options::="--force-confold" --force-yes -o Dpkg::Options::="--force-confdef" -fuy dist-upgrade
+apt-get -y autoremove
+echo 'Unattended-Upgrade::Remove-Unused-Dependencies "true";' | \
+  sudo tee -a /etc/apt/apt.conf.d/50unattended-upgrades
+echo 'Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";' | \
+  sudo tee -a /etc/apt/apt.conf.d/50unattended-upgrades
+echo 'Unattended-Upgrade::Automatic-Reboot-Time "07:15";' | \
+  sudo tee -a /etc/apt/apt.conf.d/50unattended-upgrades
+echo 'Unattended-Upgrade::Automatic-Reboot "true";' | \
+  sudo tee -a /etc/apt/apt.conf.d/50unattended-upgrades
+reboot
+EOF
   ~~~
 
 ## Setup Scripts
@@ -84,12 +90,19 @@ The basic process for each of the routers is the same, from the different direct
  * `access-rtr/`
 
 ~~~bash
+# border-rtr
 git clone https://github.com/GrumpyOldTroll/multicast-ingest-platform.git
 cd multicast-ingest-platform/
-# either border-rtr, access-rtr, or ingest-rtr
-cd border-rtr/
-./setup.sh
-sudo shutdown -r now
+cd sample-network/border-rtr/
+./setup.sh && ../docker-frr.sh && sudo reboot
+~~~
+
+~~~bash
+# access-rtr
+git clone https://github.com/GrumpyOldTroll/multicast-ingest-platform.git
+cd multicast-ingest-platform/
+cd sample-network/access-rtr/
+./setup.sh && ../docker-frr.sh && sudo reboot
 ~~~
 
 After a successful install, it should be possible to reboot and come back up gracefully.
@@ -110,6 +123,23 @@ Extra details:
  * [access-rtr](access-rtr/setup.sh):
    * runs dhcp server downstream
    * uses border-rtr's dns server
+
+If you want to build frr and run it as a service instead of using docker images for frr, you can use ../build-frr.sh instead of ../docker-frr.sh in the above installation steps.  This way got superseded by the docker approach, but the older scripts to support it are still there in case anyone prefers it (especially if they need to build local patches for frr).
+
+## Ingest Scripts
+
+There's also scripts in [ingest-host](ingest-host/) to bring the ingest-rtr from a default ubuntu install to an active ingest router.  It's similar to the access-rtr and border-rtr, but because the docker commands need the interface name to be set (to irf0), there's a post-reboot script to run.
+
+~~~bash
+# ingest-rtr
+git clone https://github.com/GrumpyOldTroll/multicast-ingest-platform.git
+cd multicast-ingest-platform/
+cd sample-network/ingest-host/
+./setup.sh && && sudo reboot
+
+# then log back in, go back to ingest-host:
+./setup2.sh
+~~~
 
 ## Interface Setup
 

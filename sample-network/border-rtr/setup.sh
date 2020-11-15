@@ -45,8 +45,6 @@ if [ "$did_netplan" = "1" ]; then
   sudo netplan apply
 fi
 
-../build-frr.sh
-
 sudo bash -x -e <<EOF
 
 # journalctl proved annoyingly large by default
@@ -70,6 +68,9 @@ systemctl restart bind9
 # dhcp for downstream and reflector
 apt install -y isc-dhcp-server
 cp etc/dhcp/dhcpd.conf /etc/dhcp/
+cp etc/default/isc-dhcp-server /etc/default/isc-dhcp-server
+# dhcp server is not coming up at boot.  applying patch --jake 2020-11
+patch -i ${PWD}/../isc-dhcp-server.service.patch -d /lib/systemd/system -p 0
 systemctl enable isc-dhcp-server.service
 systemctl restart isc-dhcp-server.service
 
