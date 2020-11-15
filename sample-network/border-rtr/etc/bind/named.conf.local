@@ -22,11 +22,25 @@ zone "201.138.250.162.in-addr.arpa" {
     file "/etc/bind/zones/reverse.201.138.250.162.in-addr.arpa.zone";
 };
 
+zone "17.60.113.164.in-addr.arpa" {
+    # source for nsf knowledge network video native multicasting on internet2
+    # udp://164.113.60.17@232.44.15.25:64277
+    type master;
+    file "/etc/bind/zones/reverse.17.60.113.164.in-addr.arpa.zone";
+};
+
 zone "51.131.174.129.in-addr.arpa" {
     # source for nsf knowledge network video native multicasting on internet2
     # udp://129.174.131.51@233.44.15.9:50001
     type master;
     file "/etc/bind/zones/reverse.51.131.174.129.in-addr.arpa.zone";
+};
+
+zone "131.55.174.129.in-addr.arpa" {
+    # source for nsf knowledge network video native multicasting on internet2
+    # udp://129.174.55.131@232.44.15.9:50001
+    type master;
+    file "/etc/bind/zones/reverse.131.55.174.129.in-addr.arpa.zone";
 };
 
 zone "40.93.128.131.in-addr.arpa" {
