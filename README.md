@@ -85,19 +85,31 @@ INTERNALUPSTREAM=10.11.1.2
 # create the networks:
 sudo docker network create --driver bridge amt-bridge
 
-sudo docker network create --driver macvlan --subnet=${SUBNET} --gateway=${GATEWAY} --opt parent=${IFACE} mcast-out
+sudo docker network create --driver macvlan \
+    --subnet=${SUBNET} --gateway=${GATEWAY} \
+    --opt parent=${IFACE} mcast-out
 
-sudo docker network create --driver bridge --subnet=${INTERNALNET} mcast-xmit
+sudo docker network create --driver bridge \
+    --subnet=${INTERNALNET} mcast-xmit
 
 # create the upstream dummy neighbor
-sudo docker run -d --name upstream-dummy-nbr --restart=unless-stopped --privileged --network mcast-xmit --ip ${INTERNALUPSTREAM} grumpyoldtroll/pim-dummy-upstream:latest
+sudo docker run --name upstream-dummy-nbr \
+    -d --restart=unless-stopped \
+    --log-opt max-size=2m --log-opt max-file=5 \
+    --privileged --network mcast-xmit \
+    --ip ${INTERNALUPSTREAM} grumpyoldtroll/pim-dummy-upstream:latest
 
 # to improve performance of the first join, pull the amtgw image:
 sudo docker pull grumpyoldtroll/amtgw:latest
 
 # create the master ingest router.  NB: This needs the docker socket
 # attached so it can launch new docker containers.
-sudo docker create --name ingest-rtr --restart=unless-stopped --privileged --network mcast-out --ip ${PIMD} -v /var/run/docker.sock:/var/run/docker.sock grumpyoldtroll/ingest-rtr:latest ${INTERNALUPSTREAM}
+sudo docker create --name ingest-rtr \
+    --restart=unless-stopped --privileged \
+    --network mcast-out --ip ${PIMD} \
+    --log-opt max-size=2m --log-opt max-file=5 \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    grumpyoldtroll/ingest-rtr:latest ${INTERNALUPSTREAM}
 sudo docker network connect mcast-xmit ingest-rtr
 sudo docker start ingest-rtr
 ~~~
@@ -140,6 +152,67 @@ sudo ip rule add from ${AMTSRCNET} table 10 priority 50
 
 # Troubleshooting
 
+## What's going on
+
+The proof of concept itself is just [pimwatch.py](src/pimwatch.py), which runs:
+
+ * [tcpdump](https://manpages.debian.org/stretch/tcpdump/tcpdump.8.en.html) to watch [PIM](https://tools.ietf.org/html/rfc7761) packets.
+ * [dig](https://manpages.debian.org/stretch/dnsutils/dig.1.en.html) for DRIAD's [DNS querying](https://tools.ietf.org/html/rfc8777#section-2.2)
+ * an [amtgw](https://hub.docker.com/r/grumpyoldtroll/amtgw) docker container to establish tunnels, and
+ * an "ip igmp join" command in frr to send a join/leave through the tunnel.
+
+The rest of the setup is so that there are PIM packets for pimwatch.py to watch and respond to.
+
+## Checking the basics
+
+You might want to make sure there's not some external kind of block happening.  For this, I generally try receiving a trickle stream I leave running for this purpose on 23.212.185.4->232.1.1.1:
+
+~~~
+# after git clone https://github.com/GrumpyOldTroll/libmcrx to get libmcrx/driad.py
+SOURCEIP=23.212.185.4
+GROUPIP=232.1.1.1
+DISCIP=$(python3 libmcrx/driad.py $SOURCEIP)
+sudo docker run -d --rm --name amtgw --privileged grumpyoldtroll/amtgw:latest $DISCIP
+sudo docker run -it --rm --name rx2 grumpyoldtroll/iperf-ssm:latest --server --udp --bind $GROUPIP --source $SOURCEIP --interval 1 --len 1500 --interface eth0
+~~~
+
+If that starts giving you one line per second that looks something like this, it means the AMT connectivity is working and there's an active sender:
+
+~~~
+$ sudo docker run -it --rm --name rx2 grumpyoldtroll/iperf-ssm:latest --server --udp --bind $GROUPIP --source $SOURCEIP --interval 1 --len 1500 --interface eth0
+setting perf ip4 ttl to 1
+------------------------------------------------------------
+Server listening on UDP port 5001
+Binding to local address 232.1.1.1
+Joining multicast group  232.1.1.1
+Joining multicast group on interface  eth0
+Accepting multicast group source  23.212.185.4
+Receiving 1500 byte datagrams
+UDP buffer size:  208 KByte (default)
+------------------------------------------------------------
+setting perf ip4 ttl to 1
+[  3] local 232.1.1.1 port 5001 connected with 23.212.185.4 port 5001
+[ ID] Interval       Transfer     Bandwidth        Jitter   Lost/Total Datagrams
+[  3]  0.0- 1.0 sec   125 Bytes  1.00 Kbits/sec   0.000 ms   87/   88 (99%)
+[  3]  1.0- 2.0 sec  0.00 Bytes  0.00 bits/sec   0.000 ms    0/    0 (-nan%)
+[  3]  2.0- 3.0 sec   250 Bytes  2.00 Kbits/sec   0.397 ms    0/    2 (0%)
+^CWaiting for server threads to complete. Interrupt again to force quit.
+[  3]  3.0- 4.0 sec   125 Bytes  1.00 Kbits/sec   0.377 ms    0/    1 (0%)
+~~~
+
+The first line reporting a high loss is an artifact of the way iperf is running.  In this model, the sender (or "client", as iperf calls it, which is kind of weird but makes some twisted sense for UDP, since servers are the ones who listen) is running from my source all the time, and the receiver (or "server" as iperf calls it) starts listening at some arbitrary time, so it sees a bunch of "loss".  The sender is restarted every 15 minutes and sends a single 125-byte packet per second (1kbps), each of which counts toward the receiver's stats.
+
+If you don't see the lines below "[  3] local 232.1.1.1 port 5001 connected with 23.212.185.4 port 5001", or they aren't updating approximately once per second, it can mean the sender is not up right now, or that something else basic that the ingest relies on isn't working yet.
+Usually (but not always) you can tell by looking at the AMT traffic on UDP port 2268.  If you see 2-way traffic between your host and $DISCIP, the tunnel is probably connected, otherwise probably not.
+
+## Where to look
+
+I usually do the first few stages of troubleshooting with tcpdump, since it gives you a good idea of where the problem lies.
+
+TBD: add some sample pcaps with network diagram locations.
+
+## How to get in once you've found where it's broken
+
 Access to the containers underlying file system with bash:
 
 ~~~bash
@@ -166,17 +239,6 @@ what gateways are launched (also visible with "docker container ls"):
 ~~~bash
 sudo docker logs -f ingest-rtr
 ~~~
-
-## What's going on
-
-The proof of concept itself is just [pimwatch.py](src/pimwatch.py), which runs:
-
- * [tcpdump](https://manpages.debian.org/stretch/tcpdump/tcpdump.8.en.html) to watch [PIM](https://tools.ietf.org/html/rfc7761) packets.
- * [dig](https://manpages.debian.org/stretch/dnsutils/dig.1.en.html) for DRIAD's [DNS querying](https://tools.ietf.org/html/rfc8777#section-2.2)
- * an [amtgw](https://hub.docker.com/r/grumpyoldtroll/amtgw) docker container to establish tunnels, and
- * an "ip igmp join" command in frr to send a join/leave through the tunnel.
-
-The rest of the setup is so that there are PIM packets for pimwatch.py to watch and respond to.
 
 # Resources
 
