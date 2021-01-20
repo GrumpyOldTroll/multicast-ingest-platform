@@ -60,7 +60,9 @@ def discover_dorms(source_ip):
         preference_ordering.extend([(str(rr.target), str(rr.port)) for rr in weighted_shuffle(rrpri, [it.weight for it in rrpri])])
     return preference_ordering
 
+normal_verify=True
 def find_base_uri(context, source_ip):
+    global normal_verify
     '''takes source ip, returns url prefix for dorms queries.  optionally accepts a requests.Session() object to maintain shared connection'''
     servers = discover_dorms(source_ip)
     # TBD: something like asyncio.staggered_race across the server options?
@@ -82,7 +84,7 @@ def find_base_uri(context, source_ip):
             session.headers.update({'Accept': 'application/xrd+xml'})
 
             hostmeta_url = url_pre + '/.well-known/host-meta'
-            resp = session.get(hostmeta_url)
+            resp = session.get(hostmeta_url, verify=normal_verify)
             root = ET.fromstring(resp.text)
             path_base = root.findall('.//{http://docs.oasis-open.org/ns/xri/xrd-1.0}Link[@rel="restconf"]')[0].attrib['href']
 
@@ -93,14 +95,14 @@ def find_base_uri(context, source_ip):
             session.headers.update({'Accept': 'application/yang-data+json'})
             
             lib_version_uri = api_pre + 'yang-library-version'
-            resp = session.get(lib_version_uri)
+            resp = session.get(lib_version_uri, verify=normal_verify)
             lib_version = resp.json()['ietf-restconf:yang-library-version']
             supported_yang_library_versions = set(['2016-06-21'])
             if lib_version not in supported_yang_library_versions:
                 logger.warning('{api_pre}yang-library-version is {date} (not in [{supported}]'.format(api_pre=api_pre, date=lib_version, supported=','.join(supported_yang_library_versions)))
 
             supported_modules_uri = api_pre + 'data/ietf-yang-library:modules-state'
-            resp = session.get(supported_modules_uri)
+            resp = session.get(supported_modules_uri, verify=normal_verify)
             supported_modules = resp.json()
             mod_list = supported_modules['ietf-yang-library:modules-state']['module']
 
@@ -112,7 +114,7 @@ def find_base_uri(context, source_ip):
             if mod_info['ietf-dorms']['revision'] not in supported_dorms_versions:
                 logger.warning('dorms version is {date} (not in [{supported}]'.format(date=mod_info['ietf-dorms']['revision'], supported=','.join(supported_dorms_versions)))
 
-            supported_cbacc_versions = set(['2019-07-31'])
+            supported_cbacc_versions = set(['2021-01-15'])
             if mod_info['ietf-cbacc']['revision'] not in supported_cbacc_versions:
                 logger.warning('cbacc version is {date} (not in [{supported}]'.format(date=mod_info['ietf-cbacc']['revision'], supported=','.join(supported_cbacc_versions)))
         except Exception as e:
@@ -129,11 +131,15 @@ def find_base_uri(context, source_ip):
     return api_pre
 
 class CbaccVals(object):
-    def __init__(self, udp_stream):
-        self.port = int(udp_stream['port'])
-        cb_vals = udp_stream['ietf-cbacc:cbacc']
+    def __init__(self, cb_vals):
+        #self.port = int(udp_stream['port'])
+        #cb_vals = udp_stream['ietf-cbacc:cbacc']
+        # default values, see:
+        # https://tools.ietf.org/html/draft-ietf-mboned-cbacc-01#section-3.2
         self.max_bps = int(cb_vals['max-bits-per-second'])
-        # TBD: set defaults
+        self.priority = int(cb_vals.get('priority', 256))
+        self.rate_window = int(cb_vals.get('data-rate-window', '2000'))
+        self.priority = int(cb_vals.get('priority', '256'))
 
     def __unicode__(self):
         return unicode(self.max_bps)
@@ -143,8 +149,8 @@ def fetch_sg_info(ctx, source, group):
     session = ctx.session
     src_ip=ip_address(source)
     group_ip=ip_address(group)
-    resp = session.get(api_pre+'data/ietf-dorms:metadata/sender={src}/group={grp}/udp-stream'.format(src=src_ip.exploded, grp=group_ip.exploded))
-    streams = [CbaccVals(udp_v) for udp_v in resp.json()['ietf-dorms:udp-stream']]
+    resp = session.get(api_pre+'data/ietf-dorms:metadata/sender={src}/group={grp}/ietf-cbacc:cbacc'.format(src=src_ip.exploded, grp=group_ip.exploded), verify=normal_verify)
+    streams = [CbaccVals(resp.json()['ietf-cbacc:cbacc'])]
     return streams
 
 def main(argv):
