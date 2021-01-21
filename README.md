@@ -4,8 +4,7 @@ This is a guide for setting up an ingest platform to pull in multicast
 traffic originating outside your local network.
 
 At this stage only IPv4 is supported.  Once IPv6 is supported in
-[FRR](https://frrouting.org/)'s [PIM](https://tools.ietf.org/html/rfc7761) implementation, we hope to upgrade this project to support
-IPv6 as well.
+[FRR](https://frrouting.org/)'s [PIM](https://tools.ietf.org/html/rfc7761) implementation, we hope to upgrade this project to support IPv6 as well.
 
 This is a [DRIAD](https://tools.ietf.org/html/rfc8777)-based proof of concept that responds to [SSM](https://tools.ietf.org/html/rfc4607) joins to externally-supplied (S,G)s by ingesting multicast traffic from outside the local network.  It works by discovering an AMT relay that's specific to the source of the (S,G).  It uses no explicit source-specific configuration, and has no explicit peering with the source's network.
 
@@ -14,105 +13,269 @@ This concept was first presented at the mboned meeting at IETF 103:
  * [Video](https://www.youtube.com/watch?v=bCy7j-DoGGc&t=56m38s)
  * [Slides](https://datatracker.ietf.org/meeting/103/materials/slides-103-mboned-draft-jholland-mboned-driad-amt-discovery-00)
 
-The idea is to make it so if someone on the internet is providing multicast
-reachable via an AMT relay, you can receive it as multicast within your
-network by setting up an ingest device according to these instructions.
+The idea is to make it so if someone on the internet is providing multicast reachable via an AMT relay, you can receive it as multicast within your network by setting up an ingest device according to these instructions, as long as the sender has set up the appropriate metadata and DNS records to support discovery.
 
-You'll need to get your network to propagate source-specific PIM Join
-messages to this device for joins to (S,G)s from outside your network.  But
-as long as you can do that, you shouldn't need anything special configured
-for multicast from different sources--anyone who sets up the right
-AMTRELAY DNS record in the DNS reverse IP tree for their source's IP
-should be able to provide traffic to your network's clients.
+You'll need to get your network to propagate source-specific PIM Join messages to this device for joins to (S,G)s from outside your network.
+But as long as you can do that, you shouldn't need anything special configured in order to support multicast from different sources--anyone who sets up the right AMTRELAY DNS record in the DNS reverse IP tree for their source's IP should be able to provide traffic to your network's clients.
 
-(NB: if you're using the [sample-network setup](sample-network), there is unfortunately a
-[route added](sample-network/border-rtr/etc/frr/staticd.conf#L12) for our known source IPs at present.
+(NB: if you're using the [sample-network setup](sample-network), there is unfortunately a [route added](sample-network/border-rtr/etc/frr/staticd.conf#L12) for our known source IPs at present.
 This is a workaround because FRR's MRIB does not yet work right.  We hope to
-also remove this hacked static route when we can get FRR's rpf fixed.  This
-source-specific configuration should not be required for a Cisco- or Juniper-
-based network, because configuring a default route for the multicast
-routing table toward the ingest point works on those platforms.)
+also remove this hacked static route when we can get FRR's rpf fixed.
+This source-specific configuration should not be required for a Cisco- or Juniper- based network, because configuring a default route for the multicast routing table toward the ingest point works on those platforms.)
+
+# Design
+
+You can skip this section if you just want to make it run, but this is a brief overview of what will end up running on the ingest platform device and what its behavior is.
+
+## Overview
+
+The goal is to send externally generated multicast traffic by making a tunnel to an auto-discovered [AMT](https://tools.ietf.org/html/rfc7450) relay for traffic joined by subscribers within your network.
+
+There are a several components the platform uses to achieve this goal, detailed below.  Here's the overal diagram:
+
+![ingest-platform](ingest-platform-diagram.png)
+
+## Docker Containers
+
+ - multiple `amtgw` gateway containers (one per actively subscribed source IP).\
+   This runs an AMT gateway instance, which forms a unicast tunnel with the AMT relay associated with the source IP
+ - one `driad-mgr` container.\
+   This uses [DRIAD](https://tools.ietf.org/html/rfc8777) to discover the appropriate AMT relay given the source IP (from the (S,G)), launches the AMT gateway containers as needed, and maintains an IGMP/MLD join locally, which the AMT gateway will use.
+ - one `pimwatch` container.\
+   This establishes a [PIM](https://tools.ietf.org/html/rfc7761) adjacency and monitors join/prune events to drive the driad-mgr.  It also forwards the multicast traffic from the docker network where the amtgw containers are sending it into the downstream network.\
+   The current implementation of the `pimwatch` container requires an upstream PIM neighbor in order to operate, even though ordinarily a PIM router should be able to forward traffic from a directly connected sender.  As a workaround for this implementation problem, there is also a `pim-dummy-upstream` container whose only purpose is to enable the operation of the `pimwatch` container.  (We aspire to remove this in a future version.)
+ - optionally, one `cbacc` container.\
+   This uses [CBACC](https://datatracker.ietf.org/doc/draft-ietf-mboned-cbacc/) to limit the traffic permitted.  If the users within your network subscribe to more than the permitted total bandwidth of traffic, this will prevent the ingest platform from subscribing to traffic that exceeds the limit (so some subscribers will not receive traffic).
+
+These containers are connected by some docker networks for routing traffic, plus a set of "join files" to communicate the set of currently joined (S,G)s between containers.
+
+## Docker Networks
+
+The networks:
+
+ - `amt-bridge`: a [bridge](https://docs.docker.com/network/bridge/) to the internet for unicast traffic.\
+   This will carry 2-way traffic to the internet for:
+
+   - AMT (UDP port 2268) for the AMT tunnels from the `amtgw` containers to the discovered relays
+   - DNS (UDP port 53) for AMTRELAY record queries from the `driad-mgr` container, and SRV, A, and AAAA record queries from the `cbacc` container
+   - HTTPS (TCP port 443) for the discovered [DORMS](https://datatracker.ietf.org/doc/draft-ietf-mboned-dorms/) server carrying the [CBACC](https://datatracker.ietf.org/doc/draft-ietf-mboned-cbacc/) metadata about the (S,G)'s bitrate.
+
+ - `native-mcast-ingest`: a local bridge where the native multicast traffic lands.\
+   The traffic on this network is:
+
+   - native multicast traffic from the `amtgw` containers.  These are the data packets that users in the network have subscribed to receive.
+   - IGMP/MLD membership queries from the `amtgw` containers and membership reports from the `driad-mgr` container.
+   - PIM hello packets between the `pimwatch` container and the `pim-upstream-dummy`
+
+ - `downstream-mcast`: a [macvlan](https://docs.docker.com/network/macvlan/) network connecting the `pimwatch` container to the downstream multicast-enabled network.\
+   This network's parent interface should be the physical interface connecting to the multicast-enabled network.  It carries:
+
+   - the PIM messages of the connected multicast-capable network
+   - the native multicast traffic to be forwarded through the network.
+   - If this interface is also the defualt route to the internet for the host, the other traffic on the box could also end up passing through this network (for instance, the NATted packets from the amt-bridge network, or ssh sessions to the host machine).
+
+### Docker Network Constraints
+
+NB: If you try to change the names of these networks, please be aware of a surprising [docker issue](https://github.com/moby/moby/issues/25181) that places constraints on the lexical ordering of the names.
+
+ - `amt-bridge` MUST be lexically earlier than `native-mcast-ingest`, otherwise the interface names visible inside the `amtgw` containers will not be the expected eth0 for the unicast AMT connection and eth1 for producing the native multicast, but would instead be reversed.
+  - You would see this problem for example if you renamed amt-bridge to outside-bridge, because 'o' is lexically later than 'n', as opposed to 'a' which is earlier.
+ - `downstream-mcast` MUST be lexically earlier than `native-mcast-ingest`, otherwise the interface names visible inside the `pimwatch` container will not be the expected eth0 for downstream and eth1 for upstream, but would instead be reversed.
+
+## Joinfiles
+
+The `pimwatch` and `cbacc` containers produce joinfiles, and the `docker-mgr` and `cbacc` containers consume joinfiles.
+
+Consuming a joinfile is done with the [watchdog](https://pypi.org/project/watchdog/) python library (where available, such as on a modern linux kernel, it uses a platform-specific notification scheme such as [inotify](https://man7.org/linux/man-pages/man7/inotify.7.html) to alert watchers on changes).`
+
+The joinfiles contain a comma-separated source ip, group ip per line.  In the case of CBACC, it may also contain (optionally) a third comma-separated value for "population", meaning the number of subscribed users.
+
+~~~
+23.212.185.5,232.1.1.1
+23.212.185.4,232.10.10.2
+~~~
+
+The (S,G) entries on each line indicate the joined (S,G)s for which traffic should be ingested if possible.
+
+`pimwatch` will change the file it produces whenever a join/prune message is observed on the physical interface.
+
+When the pimwatch joinfile changes, `cbacc` will respond by possibly changing the file it produces, depending on the results of comparing the expected aggregate bitrate to its bandwidth limit.
+
+When the cbacc joinfile changes, driad-mgr will respond by launching or shutting down amtgw instances if the active source list changes, and by starting a process that maintains a joined state for each (S,G), so that the AMT gateway instances will ingest traffic from the relays they connect to.
+
+It is possible to edit joinfiles by other means than these, to be consumed by the containers that consume them, they're just files on the file system.  These containers will regularly overwrite the joinfiles they produce, so things like manual edits will not be stable (though they might sometimes be useful for troubleshooting or experimenting).
 
 # Setup
 
 ## Prerequisites
 
   - Docker and privileged access.
-  - Unicast connectivity to the internet, including DNS.  (Can be via the same downstream multicast network or a different interface.)
+  - Outbound UDP and TCP unicast connectivity to the internet that permits return traffic for the same connection.  (This can be via the same downstream multicast network or a different interface.)
   - Downstream multicast-capable network running PIM, with an RPF to this device for the sources you want to ingest (e.g. with "ip mroute 0.0.0.0/0 \<interface\>" towards this device's interface)
+  - Receivers downstream of the multicast-capable network with multicast receiving applications using source-specific multicast joins (e.g. [vlc](https://www.videolan.org/vlc/) or [iperf-ssm](https://github.com/GrumpyOldTroll/iperf-ssm) or some sample apps we can provide on request.)
 
-## Installation
+NB: The containers have been tested with ubuntu 20.04 in a default server installation (plus `apt-get install -y docker.io`).
+In some other setups, we have seen firewall or apparmor rules that interfere with the expected behavior of some of the containers.
+In at least one case, a default CentOS 8 installation was overwritten with ubuntu 20.04 rather than trying to troubleshoot it, and we're still not sure what all the issues were yet.
 
-There's 3 different kinds of docker containers that will be running:
- - the [master ingest router](https://hub.docker.com/r/grumpyoldtroll/ingest-rtr).  Directly connected to the multicast network and running PIM.
- - a [dummy upstream router](https://hub.docker.com/r/grumpyoldtroll/pim-dummy-upstream).  (This is currently necessary as a workaround for another FRR bug, but again hopefully should be possible to remove one day.)
- - Potentially multiple [AMT gateway](https://hub.docker.com/r/grumpyoldtroll/amtgw) containers that get launched by the ingest router
+NB2: On ubuntu 18 and 20, the default "sudo apt-get install docker.io" state has 2 known issues:
 
-You'll install the first 2 containers, and the ingest-rtr will launch other
-docker containers autonomously in response to PIM messages, in order to
-ingest traffic over AMT and feed it as native multicast into your network.
+  - docker containers don't restart after startup by default.  According to [online sources](https://docs.docker.com/engine/install/linux-postinstall/#configure-docker-to-start-on-boot) it's possible to fix this by manually running this after installing:
 
-There's 3 docker network pieces to this setup:
- - **mcast-out**: the connection to the external multicast network.  (This name MAY be changed if you like, but MUST be alphabetically earlier than mcast-xmit due to a [docker issue](https://github.com/moby/moby/issues/25181).)
- - **amt-bridge**: the internal network that AMT gateways use to open the tunnels they establish to the outside.  This name MUST be "amt-bridge", it is directly used from inside the ingest-rtr.
- - **mcast-xmit**: the internal network where multicast comes out from the AMT gateways and gets forwarded to mcast-out.  This name MUST be "mcast-xmit", it is directly used from inside the master.  (If you change the source and thus change this name, it still MUST be alphabetically later than BOTH mcast-out and amt-bridge, due to a [bug in docker](https://github.com/moby/moby/issues/25181))
+    ~~~
+    sudo systemctl enable docker.service
+    sudo systemctl enable container.service
+    ~~~
 
-### Variables
+  - all docker commands require sudo after the default install.  Note that although this is [simple to fix](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user), some containers require --privileged, and these may need to be run with sudo regardless.  Hopefully a future version can improve on this by using more [narrow capabilities](https://docs.docker.com/engine/reference/run/#runtime-privilege-and-linux-capabilities) explicitly.
+    - the setup commands below currently assume that you are running docker commands with sudo privileges for all docker commands.
 
-For convenience, the "Commands" section below uses these variables that should be configured based on your network the ingest device is plugging into:
+## Common Variables
+
+The commands below use these environment variables, collected here for easier tuning according to your setup.
+
+These settings can be pasted verbatim if using the [sample-network](sample-network) setup, but in other cases it will be necessary to change values to match your environment.
+
+~~~
+IFACE=irf0
+GATEWAY=10.9.1.1
+SUBNET=10.9.1.0/24
+PIMD=10.9.1.2
+# these may be helpful for extracting the IP of $IFACE in a script:
+#pimbase=$(ip addr show dev ${IFACE} | grep "inet " | tail -n 1 | awk '{print $2;}' | cut -f1 -d/)
+#PIMD=$(python3 -c "from ipaddress import ip_address as ip; x=ip('${pimbase}'); print(ip(x.packed[:-1]+((x.packed[-1]+1)%256).to_bytes(1,'big')))")
+
+# MiBps limit (of UDP payload bit rates)
+BW_MAX_MIBPS=50
+
+JOINFILE=${HOME}/pimwatch/pimwatch.sgs
+CBJOINFILE=${HOME}/cbacc/cbacc.sgs
+
+INGEST_VERSION=0.0.4
+~~~
+
+Variable meanings:
 
   - **IFACE**:  the physical interface on the host that you'll be plugging into your multicast network.  (I named mine irf for "ingest reflector", but it should match the name of the physical interface on your host machine.)
   - **GATEWAY**: the IP address of the gateway for the ingest device's connection within your multicast network.  This should be the next hop toward a default route out that interface.
   - **SUBNET**: the subnet for PIMD and GATEWAY
   - **PIMD**: the IP address the PIM adjacency will use for connecting over IFACE, from inside the container.  If you are using IFACE for other traffic, this IP has to be different from the IP address for the host.  (There's a sample command below that tries to extract it from the output of "ip addr show dev $IFACE" and then add one.)
+  - **BW_MAX_MIBPS**: The max bandwidth, to be enforced by `cbacc` according to the flow metadata.
+  - **JOINFILE**: The full path of the joinfile produced by `pimwatch`
+  - **CBJOINFILE**: The full path of the joinfile consumed by `driad-mgr`
 
-~~~bash
-IFACE=irf0
-GATEWAY=10.9.1.1
-SUBNET=10.9.1.0/24
-PIMD=10.9.1.3
-#pimbase=$(ip addr show dev ${IFACE} | grep "inet " | tail -n 1 | awk '{print $2;}' | cut -f1 -d/)
-#PIMD=$(python3 -c "from ipaddress import ip_address as ip; x=ip('${pimbase}'); print(ip(x.packed[:-1]+((x.packed[-1]+1)%256).to_bytes(1,'big')))")
+Because several of the containers require privileged access (`pimwatch`, `pim-upstream-dummy`, and `amtgw` for access to the kernel's multicast routing table, plus creation of a tap interface for `amtgw` and packet capture and sending of PIM packets for `pimwatch` and `pim-upstream-dummy`, and `driad-mgr` for access to the docker socket so it can launch amtgw instances with privileged access).
 
+## Network Setup
 
-# you MAY change these, but shouldn't need to.  This is the internal
-# network where the native multicast arrives unwrapped from AMT, and
-# these addresses never appear outside a virtual bridge internal to this
-# host.
-INTERNALNET=10.11.1.0/24
-INTERNALUPSTREAM=10.11.1.2
-
-# create the networks:
+~~~
 sudo docker network create --driver bridge amt-bridge
-
+sudo docker network create --driver bridge mcast-native-ingest
 sudo docker network create --driver macvlan \
-    --subnet=${SUBNET} --gateway=${GATEWAY} \
-    --opt parent=${IFACE} mcast-out
-
-sudo docker network create --driver bridge \
-    --subnet=${INTERNALNET} mcast-xmit
-
-# create the upstream dummy neighbor
-sudo docker run --name upstream-dummy-nbr \
-    -d --restart=unless-stopped \
-    --log-opt max-size=2m --log-opt max-file=5 \
-    --privileged --network mcast-xmit \
-    --ip ${INTERNALUPSTREAM} grumpyoldtroll/pim-dummy-upstream:latest
+    --subnet=${SUBNET} \
+    --opt parent=${IFACE} downstream-mcast
 
 # to improve performance of the first join, pull the amtgw image:
-sudo docker pull grumpyoldtroll/amtgw:latest
+sudo docker pull grumpyoldtroll/amtgw:${INGEST_VERSION}
+~~~
 
-# create the master ingest router.  NB: This needs the docker socket
-# attached so it can launch new docker containers.
-sudo docker create --name ingest-rtr \
-    --restart=unless-stopped --privileged \
-    --network mcast-out --ip ${PIMD} \
+## Running Containers
+
+### pimwatch
+
+The pimwatch container runs an instance of [PIM](https://tools.ietf.org/html/rfc7761) on the downstream interface and responds to join and prune messages by updating a joinfile and by forwarding matching traffic that arrives for joined (S,G)s at the upstream interface on the downstream interface.
+
+~~~
+# run the upstream dummy neighbor
+sudo docker run \
+    --name upstream-dummy-nbr \
+    --privileged \
+    --network mcast-native-ingest \
+    --log-opt max-size=2m --log-opt max-file=5 \
+    -d --restart=unless-stopped \
+    grumpyoldtroll/pim-dummy-upstream:${INGEST_VERSION}
+
+# ensure the joinfile is present
+mkdir -p $(dirname ${JOINFILE}) && touch ${JOINFILE}
+
+# create pimwatch, attach extra network, and start it
+sudo docker create \
+    --name pimwatch \
+    --privileged \
+    --network downstream-mcast --ip ${PIMD} \
+    --log-opt max-size=2m --log-opt max-file=5 \
+    --restart=unless-stopped \
+    -v $(dirname ${JOINFILE}):/etc/pimwatch/ \
+    grumpyoldtroll/pimwatch:${INGEST_VERSION} \
+      -v \
+      --joinfile /etc/pimwatch/$(basename ${JOINFILE}) && \
+sudo docker network connect mcast-native-ingest pimwatch && \
+sudo docker start pimwatch
+~~~
+
+### cbacc
+
+The cbacc container uses bandwidth metadata according to the [CBACC](https://datatracker.ietf.org/doc/draft-ietf-mboned-cbacc/) spec to ensure that the bandwidth of ingested traffic does not exceed the limit (in MiBps) given to the "bandwidth" parameter.
+
+If you want to permit ingesting traffic without cbacc metadata, you can provide a `--default <bw>` value to this call, and it should treat flows without available metadata as having the given value in MiBps.
+
+If you don't want to run cbacc at all, you don't have to.  Set `CBJOINFILE=$JOINFILE` before starting driad-mgr and don't launch cbacc, and driad-mgr will use the joinfile produced by pimwatch, rather than the filtered joinfile produced by cbacc.
+
+~~~
+# ensure both joinfiles are present
+mkdir -p $(dirname ${JOINFILE}) && touch ${JOINFILE}
+mkdir -p $(dirname ${CBJOINFILE}) && touch ${CBJOINFILE}
+
+# run cbacc
+sudo docker run \
+    --name cbacc \
+    --log-opt max-size=2m --log-opt max-file=5 \
+    --network amt-bridge \
+    -v $(dirname ${JOINFILE}):/var/run/cbacc-in/ \
+    -v $(dirname ${CBJOINFILE}):/var/run/cbacc-out/ \
+    --restart=unless-stopped -d \
+    grumpyoldtroll/cbacc:${INGEST_VERSION} \
+      -v \
+      --input-file /var/run/cbacc-in/$(basename ${JOINFILE}) \
+      --output-file /var/run/cbacc-out/$(basename ${CBJOINFILE}) \
+      --bandwidth ${BW_MAX_MIBPS}
+~~~
+
+### driad-mgr
+
+`driag-mgr` discovers AMT relays suitable for the source IP in an (S,G) of an SSM join, using and AMTRELAY DNS query, roughly as described in [RFC 8777](https://tools.ietf.org/html/rfc8777).
+
+If it's able to discover a suitable AMT relay, it launches an AMT gateway to connect to that relay, and issues joins for (S,G)s with that source IP.
+
+~~~
+sudo docker run \
+    --name driad-mgr \
+    --privileged --network mcast-native-ingest \
     --log-opt max-size=2m --log-opt max-file=5 \
     -v /var/run/docker.sock:/var/run/docker.sock \
-    grumpyoldtroll/ingest-rtr:latest ${INTERNALUPSTREAM}
-sudo docker network connect mcast-xmit ingest-rtr
-sudo docker start ingest-rtr
+    -v $(dirname $CBJOINFILE):/var/run/ingest/ \
+    -d --restart=unless-stopped \
+    grumpyoldtroll/driad-ingest:${INGEST_VERSION} \
+      --amt amt-bridge \
+      --native mcast-native-ingest \
+      --joinfile /var/run/ingest/$(basename $CBJOINFILE) -v
 ~~~
+
+Parameters to the driad-mgr container are:
+
+ * **amt**\
+  The docker network that AMT gateways will use for AMT traffic.
+ * **native**\
+  The docker network that AMT gateways will send native multicast to, after receiving it from an AMT tunnel
+ * **joinfile**\
+  The location within the container of the joinfile to monitor.
+
+Some things also need to be mounted in the container:
+
+ * **/var/run/docker.sock**\
+  The docker socket to use for issuing docker commands to spawn and destroy the AMT gateways
+ * **/var/run/ingest/**\
+  The directory containing the joinfile that's passed in has to be mounted as a directory.  This is because internally, the file is watched with [inotify](https://man7.org/linux/man-pages/man7/inotify.7.html), which wants to monitor the directory for changes.
 
 ### NATting AMT Traffic
 
@@ -150,27 +313,18 @@ sudo ip route add table 10 to default via ${GATEWAY} dev ${IFACE}
 sudo ip rule add from ${AMTSRCNET} table 10 priority 50
 ~~~
 
+Some have said there's other alternative setups that are necessary in their environments.  TBD: collect a set of use cases, network diagrams, with helpful config examples.
+
 # Troubleshooting
-
-## What's going on
-
-The proof of concept itself is just [pimwatch.py](src/pimwatch.py), which runs:
-
- * [tcpdump](https://manpages.debian.org/stretch/tcpdump/tcpdump.8.en.html) to watch [PIM](https://tools.ietf.org/html/rfc7761) packets.
- * [dig](https://manpages.debian.org/stretch/dnsutils/dig.1.en.html) for DRIAD's [DNS querying](https://tools.ietf.org/html/rfc8777#section-2.2)
- * an [amtgw](https://hub.docker.com/r/grumpyoldtroll/amtgw) docker container to establish tunnels, and
- * an "ip igmp join" command in frr to send a join/leave through the tunnel.
-
-The rest of the setup is so that there are PIM packets for pimwatch.py to watch and respond to.
 
 ## Checking the basics
 
-You might want to make sure there's not some external kind of block happening.  For this, I generally try receiving a trickle stream I leave running for this purpose on 23.212.185.4->232.1.1.1:
+You might want to make sure there's not some external kind of block happening.  For this, I generally try receiving a trickle stream I leave running for this purpose on 23.212.185.4->232.1.1.1.  You can run a receiver for it directly on your ingest platform to ensure the ingest platform's network can successfully discover and ingest the traffic at all:
 
 ~~~
-# after git clone https://github.com/GrumpyOldTroll/libmcrx to get libmcrx/driad.py
 SOURCEIP=23.212.185.4
 GROUPIP=232.1.1.1
+# after git clone https://github.com/GrumpyOldTroll/libmcrx to get libmcrx/driad.py
 DISCIP=$(python3 libmcrx/driad.py $SOURCEIP)
 sudo docker run -d --rm --name amtgw --privileged grumpyoldtroll/amtgw:latest $DISCIP
 sudo docker run -it --rm --name rx2 grumpyoldtroll/iperf-ssm:latest --server --udp --bind $GROUPIP --source $SOURCEIP --interval 1 --len 1500 --interface eth0
@@ -213,18 +367,16 @@ TBD: add some sample pcaps with network diagram locations.
 
 ## How to get in once you've found where it's broken
 
-Access to the containers underlying file system with bash:
+Access to the containers underlying file system with sh:
 
 ~~~bash
-sudo docker exec -it ingest-rtr bash
+sudo docker exec -it driad-mgr sh
 ~~~
 
-There are logs in /var/log/frr/, and frr config files in /etc/frr/.
-
-Access to the router configuration with vtysh:
+Inside pimwatch, there are logs in /var/log/frr/, and frr config files in /etc/frr/, and access to the router configuration with vtysh:
 
 ~~~bash
-sudo docker exec -it ingest-rtr vtysh
+sudo docker exec -it pimwatch vtysh
 ~~~
 
 This is similar to using a Cisco command line, and supports many
@@ -237,7 +389,7 @@ logging that at least shows whether joins are reaching the router and
 what gateways are launched (also visible with "docker container ls"):
 
 ~~~bash
-sudo docker logs -f ingest-rtr
+sudo docker logs -f pimwatch
 ~~~
 
 # Resources

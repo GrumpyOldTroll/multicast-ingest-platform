@@ -1,0 +1,840 @@
+#!/usr/bin/python3
+import sys
+import subprocess
+import logging
+import ipaddress
+import re
+import datetime
+import random
+import time
+import json
+import argparse
+import signal
+from os.path import abspath, dirname, isfile, basename
+from enum import Enum
+from watchdog.observers import Observer
+from watchdog.events import PatternMatchingEventHandler
+
+logger = None
+mcast_nwname = 'mcast-native-ingest'
+amt_bridge_nwname = 'amt-bridge'
+dkr_cmd = '/usr/bin/docker'
+
+#upstream_neighbor_ip = '10.10.1.1'
+#self_ip = '10.9.1.128'
+
+class AMTRelayOption(object):
+    def __init__(self, precedence, discovery_optional, typ, value):
+        self.precedence = int(precedence)
+        self.discovery_optional = int(discovery_optional)
+        self.typ = int(typ)
+        self.value = value
+        if typ == 1 or typ == 2:
+            self.ip = ipaddress.ip_address(value)
+        else:
+            self.ip = None
+
+    def __str__(self):
+        return 'prec=%d,d=%d,typ=%d,val=%s' % (self.precedence, self.discovery_optional, self.typ, self.value)
+
+    def parse_response(out, cmd):
+        '''
+        example output:
+$ dig +noall +answer +nocomments -t TYPE260 3.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.e.4.1.0.0.6.2.ip6.arpa
+3.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.e.4.1.0.0.6.2.ip6.arpa. 7054 IN CNAME	3.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.v6.driad.akastream2.com.
+3.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.v6.driad.akastream2.com. 43054 IN TYPE260 \# 22 1003047233763603616D7406616B61646E73036E6574
+$ dig +noall +answer +nocomments -t TYPE260 5.185.212.23.in-addr.arpa
+5.185.212.23.in-addr.arpa. 7200	IN	CNAME	5.v4.driad.akastream2.com.
+5.v4.driad.akastream2.com. 43200 IN	TYPE260	\# 22 1003047235763403616D7406616B61646E73036E6574
+        '''
+        options = []
+        for line in out.split('\n'):
+            if not line:
+                continue
+
+            try:
+                domain, expiry, _, typ, val = line.split(maxsplit=4)
+            except ValueError as e:
+                logger.warning('skipping line: error "%s" parsing dig output line "%s": failed to map into "domain, expiry, IN, type, value" (cmd=%s)' % (e, line, cmd))
+                continue
+
+            if typ == 'CNAME' or typ=='DNAME':
+                # we expect some cname resolving here, see examples.
+                # TBD: should we do something with these?
+                continue
+
+            if typ != 'TYPE260' and typ != 'AMTRELAY':
+                logger.warning('unexpected type %s in dig output line %s, skipping (cmd=%s)' % (typ, line, cmd))
+                continue
+
+            opt = None
+            if typ == 'AMTRELAY':
+                precedence, discovery_optional, valtyp, valval = val.split()
+                opt = AMTRelayOption(int(precedence), int(discovery_optional), int(valtyp), valval)
+            else:
+                opt = AMTRelayOption.parse_generic_amtrr_data(val, cmd)
+
+            if not opt:
+                continue
+            logger.info('found relay option %s' % opt)
+            options.append(opt)
+        return options
+
+    def parse_generic_amtrr_data(response_line, cmd):
+        # example:
+        # '\# 22 1003047234763403616d7406616b61646e73036e6574
+        # precedence 128, dbit=0, type 3 (dns name), 'r4v4.amt.akadns.net'
+        out = response_line
+        out_sep = out.split(None, 2)
+        if len(out_sep) != 3:
+            logger.error('unexpected format of DNS response from %s: "%s"' % (cmd, out))
+            return None
+
+        head, sz_str, content = out_sep
+        if head == r'\#':
+            try:
+                sz = int(sz_str)
+            except ValueError as e:
+                logger.error('failed size conversion: %s from %s, in "%s"' % (e, sz_str, out))
+                return None
+            try:
+                bts = bytes.fromhex(content)
+            except ValueError as e:
+                logger.error('failed "unknown type" binary parse error: %s, from "%s", in "%s"' % (e, content, out))
+                return None
+            if sz != len(bts):
+                logger.error('converted bytes len %d of "%s" != given len %d parsing "%s" from "%s"' % (len(bts), content, sz, out, cmd))
+                return
+            if sz < 3:
+                logger.error('too few bytes %d parsing "%s" from "%s"' % (len(bts), out, cmd))
+                return None
+            precedence = bts[0]
+            discovery_optional = bool(128&bts[1])
+            typ = 127&bts[1]
+            bin_content = bts[2:]
+            try:
+                if typ == 1:
+                    val = ipaddress.IPv4Address(bin_content)
+                elif typ == 2:
+                    val = ipaddress.IPv6Address(bin_content)
+                elif typ == 3:
+                    idx = 0
+                    name = ''
+                    while idx < len(bin_content):
+                        hoplen=bin_content[idx]
+                        idx += 1
+                        if idx + hoplen > len(bin_content) or hoplen < 0:
+                            logger.error('bad wire-encoded dns name (hoplen=%d at %d with %d left, so far name="%s"):\n%s\n%s' % (hoplen, idx, len(bin_content)-idx, name, content, '  '*idx + '^'))
+                            return None
+                        if hoplen == 0:
+                            break
+                        name += bin_content[idx:idx + hoplen].decode() + '.'
+                        idx += hoplen
+                    val = name
+                else:
+                    logger.error('unknown type %d parsed from "%s" returned from "%s"' % (typ, out, cmd))
+                    return None
+            except ValueError as e:
+                logger.error('error "%s" parsing "%s" returned from "%s"' % (e, out, cmd))
+                return None
+        else:
+            # TBD: get an implementation with the decoded format to try this
+            # logger.error('expected head to start with \\#: "%s"' % out)
+            content_sep = content.split(None, 1)
+            if len(content_sep) != 2:
+                logger.error('failed to convert formatted content "%s" from "%s"' % (out, cmd))
+                return None
+            pr_str, do_str = head, sz_str
+            typ_str, content_str = content_sep
+            try:
+                precedence = int(pr_str)
+                discovery_optional = bool(int(do_str))
+                typ = int(typ_str)
+                if typ == 1:
+                    val = ipaddress.IPv4Address(content_str)
+                elif typ == 2:
+                    val = ipaddress.IPv6Address(content_str)
+                elif typ == 3:
+                    val = content_str
+                else:
+                    logger.error('unknown type %d parsed from "%s" returned from "%s"' % (typ, out, cmd))
+                    return None
+            except ValueError as e:
+                logger.error('error "%s" parsing "%s" returned from "%s"' % (e, out, cmd))
+                return None
+
+        return AMTRelayOption(precedence, discovery_optional, typ, val)
+
+class LiveSG(object):
+    def __init__(self, gw, source_ip, group_ip, expire_time):
+        self.gw = gw
+        self.source = ipaddress.ip_address(source_ip)
+        self.group = ipaddress.ip_address(group_ip)
+        if not self.group.is_multicast:
+            raise ValueError('non-multicast group for %s: "%s"' % (source, group))
+        self.join_p = None
+        self.expire_time = expire_time
+
+    def __repr__(self):
+        return '%s->%s' % (self.source, self.group)
+
+class AMTGateway(object):
+    def __init__(self, relay_ip, contname):
+        self.relay_ip = ipaddress.ip_address(relay_ip)
+        self.live_sgs = {} # (s,g)->LiveSG
+        self.contname = contname
+
+    def __repr__(self):
+        return 'gw(%s):%d' % (self.relay_ip, len(self.live_sgs))
+
+class ChannelManager(object):
+
+    def __init__(self, native_ifname):
+        self.last_sg_set = set()
+        self.native_ifname = native_ifname
+        self.live_sgs = {}  # (src_ip,grp_ip) -> LiveSG
+        self.relay_ips = {} # source_ip -> relay_ip
+        self.live_gateways = {} # relay_ip -> AMTGateway
+                                # invariants:
+                                # *self.relay_ips.get(sg.source) == gw.relay_ip
+                                #  for all sg in gw.live_sgs.values()
+                                # *self.live_gateways.get(gw.relay_ip)==gw
+                                # for all gw in self.live_gateways.values()
+        self.bad_relays = {} # ip4/ip6/hostname -> datetime when last failed
+        self.badness_duration = datetime.timedelta(hours=1)
+
+    def check_pre_existing(self):
+        global logger, mcast_nwname, dkr_cmd
+
+        '''
+        cmd = ['/usr/sbin/smcroutectl', 'show', 'groups']
+        logger.info(f'checking pre-existing joined groups on {self.native_ifname}')
+        joined_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        out, err = joined_p.communicate(cmd)
+        retcode = joined_p.wait()
+        lines = [line.strip() for line in out.split('\n')]
+        joined_re = re.compile(r'\((?P<src>[0-9a-fA-F:.]+)\s*,\s*(?P<grp>[0-9a-fA-F:.]+)\)\s*(?P<ifn>\S+)')
+        for line in lines:
+            if not line:
+                continue
+            m = joined_re.match(line)
+            if not m:
+                logger.debug(f'skipped non-matching smcroutectl show groups line: {line}')
+                continue
+            ifn = m.group('ifn')
+            if ifn != self.native_ifname:
+                logger.debug(f'ignoring joined (S,G) for non-matching interface {ifn}: {line}')
+                continue
+            src = m.group('src')
+            grp = m.group('grp')
+            logger.info(f'leaving pre-existing joined channel ({src},{grp})')
+            cmd = ['/usr/sbin/smcroutectl', 'leave', self.native_ifname,
+                src, grp]
+            leaving_p = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE)
+            out,err = leaving_p.communicate(cmd)
+            retcode = leaving_p.wait()
+            if retcode != 0:
+                logger.error(f'leave pre-existing channel ({src},{grp}) failed')
+                logger.error(f'return code {retcode} from {cmd}, out="{out}", err="{err}"')
+        '''
+
+        '''find and stop pre-existing containers and joins that came from ingest-mgr:
+$ docker container ls --format={{.Names}}
+ingest-gw-18.144.22.247
+        '''
+        # at startup, give docker service some time to start
+        retries = 0
+        while True:
+            cmd = [dkr_cmd, 'container', 'ls', '--format={{.Names}}']
+            dock_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+            out, err = dock_p.communicate(cmd)
+            retcode = dock_p.wait()
+            if retcode == 0:
+                if retries != 0:
+                    logger.info('(retry successful)')
+                break
+
+            retries += 1
+            if retries > 5:
+                logger.error('(startup docker functionality check: retry limit exceeded): return code %d from %s, out="%s", err="%s"' % (retcode, cmd, out.strip(), err.strip()))
+                return -1
+            logger.info('(retry in 1s) return code %d from %s, out="%s", err="%s"' % (retcode, cmd, out.strip(), err.strip()))
+            time.sleep(1)
+
+        if err:
+            logger.warning('stderr output from %s: "%s"' % (cmd, err))
+        for line in out.split('\n'):
+            if line.startswith('ingest-gw-'):
+                logger.warning('shutting down pre-existing ingest container %s' % line)
+
+                cmd = [dkr_cmd, 'stop', line.strip()]
+                dock_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+                out, err = dock_p.communicate(cmd)
+                retcode = dock_p.wait()
+                if retcode != 0:
+                    logger.error('shutdown of pre-existing ingest container %s failed, aborting' % line)
+                    logger.error('return code %d from %s, out="%s", err="%s"' % (retcode, cmd, out, err))
+                    return -1
+
+                if err:
+                    logger.warning('stderr output from %s: "%s"' % (cmd, err))
+
+        cmd = [dkr_cmd, 'network', 'inspect', mcast_nwname]
+        dock_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        out, err = dock_p.communicate(cmd)
+        retcode = dock_p.wait()
+        if retcode != 0:
+            logger.error('no %s network detected, aborting' % mcast_nwname)
+
+            '''
+            cmd = [dkr_cmd, 'network', 'create', '--driver', 'macvlan', '--subnet=10.9.1.0/24', '--ip-range=10.9.1.64/26', '--gateway=10.9.1.1', '-o', 'parent=irf0', mcast_nwname]
+            dock_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+            out, err = dock_p.communicate(cmd)
+            retcode = dock_p.wait()
+            if retcode != 0:
+                logger.warning('return code %d from %s, out="%s", err="%s"' % (retcode, cmd, out, err))
+                return
+            '''
+            return -1
+        return 0
+
+    def pick_relay_for_source(self, options):
+        if not options:
+            return None
+        if len(options) < 1:
+            return None
+        worse_options = sorted(options, key=lambda x: x.precedence)
+        options = []
+
+        now = None
+        while True:
+            if len(options) < 1:
+                if len(worse_options) < 1:
+                    return None
+                low_p = worse_options[0].precedence
+                new_worse = []
+                for opt in worse_options:
+                    lst = options if opt.precedence == low_p else new_worse
+                    lst.append(opt)
+                worse_options = new_worse
+            assert(len(options) > 0)
+            idx = random.randrange(len(options))
+            logger.info('randomly chose idx %d of %d relay options' % (idx, len(options)))
+            opt = options[idx]
+            bad_time = self.bad_relays.get(opt.value)
+            if not bad_time:
+                return opt
+
+            if not now:
+                now = datetime.datetime.now()
+
+            if now - bad_time >= self.badness_duration:
+                logger.warning('relay %s previously failed at %s, retrying since after %s' % (opt.value, bad_time, self.badness_duration))
+                del(self.bad_relays[opt.value])
+                return opt
+
+            logger.warning('rejected relay %s that last failed at %s (< %s)' % (opt.value, bad_time, self.badness_duration))
+            del(options[idx])
+
+        return None
+
+    def find_relay_options_for_source(self, src_ip):
+        name = src_ip.reverse_pointer
+        cmd = ['/usr/bin/dig', '+noall', '+answer', '+nocomments', '-t', 'TYPE260', name]
+        dig_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        out, err = dig_p.communicate(cmd)
+        retcode = dig_p.wait()
+        if retcode != 0:
+            logger.warning('return code %d from %s, out="%s", err="%s"' % (retcode, cmd, out, err))
+            return None
+
+        if err:
+            logger.warning('stderr output from %s: "%s"' % (cmd, err))
+
+        return AMTRelayOption.parse_response(out, cmd)
+
+    def find_relay(self, src_ip):
+        options = self.find_relay_options_for_source(src_ip)
+        opt = None
+        while True:
+            if opt:
+                # last try failed ip lookup. remove it and try again
+                self.bad_relays[opt.value] = datetime.datetime.now()
+                options = [o for o in options if opt.value != o.value]
+            opt = self.pick_relay_for_source(options)
+            if not opt:
+                return None
+            if opt.ip:
+                return opt
+            assert(opt.typ == 3)
+            cmd = ['/usr/bin/dig', '+short', opt.value]
+            dig_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+            out, err = dig_p.communicate(cmd)
+            retcode = dig_p.wait()
+            if retcode != 0:
+                logger.error('return code %s from %s, out="%s", err="%s", rejecting relay %s' % (retcode, cmd, out, err, opt.value))
+                continue
+            if err:
+                logger.warning('stderr output from %s: "%s"' % (cmd, err))
+
+            out = out.strip()
+            if len(out) == 0:
+                logger.error('no ips from "%s", rejecting relay %s' % (cmd, opt.value))
+                continue
+            out_lines = out.split('\n')
+            out_line = out_lines[random.randrange(len(out_lines))]
+            try:
+                out_ip = ipaddress.ip_address(out_line)
+            except ValueError as e:
+                logger.error('bad ip "%s" from "%s": %s, rejecting relay %s' % (out_line, cmd, e, opt.value))
+                continue
+            opt.ip = out_ip
+            return opt
+
+    def launch_gateway(self, relay_ip):
+        global logger, mcast_nwname, amt_bridge_nwname, dkr_cmd
+        logger.info('launching gateway to relay %s' % (relay_ip,))
+
+        nwname = mcast_nwname
+        contname = 'ingest-gw-%s' % (relay_ip.exploded)
+        imagename = 'grumpyoldtroll/amtgw:0.0.4'
+        cmd = [dkr_cmd, 'create', '--rm',
+                '--name', contname,
+                '--privileged',
+                '--log-opt', 'max-size=2m', '--log-opt', 'max-file=5',
+                '--network', amt_bridge_nwname,
+                imagename, str(relay_ip)]
+        logger.info('running: %s' % (' '.join(cmd)))
+        launch_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        out, err = launch_p.communicate(cmd)
+        retcode = launch_p.wait()
+        if retcode != 0:
+            logger.error('return code %s from %s, out="%s", err="%s", failed gw launch' % (retcode, cmd, out, err))
+            return None
+
+        cmd = [dkr_cmd, 'network', 'connect', nwname, contname]
+        logger.info('running: %s' % (' '.join(cmd)))
+        connect_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        out, err = connect_p.communicate(cmd)
+        retcode = connect_p.wait()
+        if retcode != 0:
+            logger.error('return code %s from %s, out="%s", err="%s", failed gw connect' % (retcode, cmd, out, err))
+            cmd = [dkr_cmd, 'container', 'stop', contname]
+            stopret = subprocess.run(cmd)
+            logger.warning('stopped container: %s' % (stopret))
+            return None
+
+        time.sleep(1)
+        cmd = [dkr_cmd, 'start', contname]
+        logger.info('running: %s' % (' '.join(cmd)))
+        start_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        out, err = start_p.communicate(cmd)
+        retcode = start_p.wait()
+        if retcode != 0:
+            logger.error('return code %s from %s, out="%s", err="%s", failed gw start' % (retcode, cmd, out, err))
+            cmd = [dkr_cmd, 'container', 'stop', contname]
+            stopret = subprocess.run(cmd)
+            logger.warning('stopped container: %s' % (stopret))
+            return None
+
+        gw = AMTGateway(relay_ip, contname)
+        self.live_gateways[relay_ip] = gw
+
+        return gw
+
+
+    def launch_sg_join(self, sg, gw, expire_time):
+        global logger, dkr_cmd
+        source, group = sg
+        assert(not sg in gw.live_sgs)
+        assert(not sg in self.live_sgs)
+
+        logger.info('launching join for %s' % (sg,))
+
+        source = ipaddress.ip_address(source)
+        group = ipaddress.ip_address(group)
+        cmd = ['/usr/bin/stdbuf', '-oL', '-eL',
+            '/bin/ssm-stay-joined', str(source), str(group), '65534']
+        logger.info(f'running {" ".join(cmd)}')
+        join_p = subprocess.Popen(cmd)
+
+        '''
+        # the third old way was to run smcroutectl, but it is not
+        # compatible with pimd running on a machine on the same kernel and
+        # (even in another container), I think.
+        cmd = ['/usr/sbin/smcroutectl', 'join', self.native_ifname,
+                str(source), str(group)]
+        logger.info('running %s' % (' '.join(cmd)))
+        launch_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        out, err = launch_p.communicate()
+        '''
+
+        '''
+        # the second old way was to launch igmp join inside frr, but now
+        # I want to do it without frr, so I use smcroutectl instead.
+        cmd = ['/usr/bin/vtysh']
+        in_stdio = "config term\ninterface eth1\nip igmp join %s %s\nexit\nexit\n" % (group, source)
+        logger.info('running %s <<EOF\n%sEOF' % (' '.join(cmd), in_stdio))
+        launch_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, universal_newlines=True)
+        out, err = launch_p.communicate(input=in_stdio)
+        '''
+
+        '''
+        # the old way was to launch another docker container just to
+        # run iperf-ssm.  The new way is the above attempt to do an igmp
+        # join inside vtysh
+        nwname = mcast_nwname
+        contname = 'pimwatch-join-%s-%s' % (source.exploded, group.exploded)
+        imagename = 'grumpyoldtroll/iperf-ssm:latest'
+        # TBD: support v6--iperf command is different
+        # TBD: iperf-ssm is overkill and cruelly doomed to wait (or worse,
+        # catch packets if they go to the right port). all i need is a
+        # program that stays joined in the gateway's data network.
+        cmd = [dkr_cmd, 'run', '-d', '--network', nwname, '--rm', '--name', contname, imagename, '--server', '--udp', '--bind', str(group), '--source', str(source), '--interval', '1', '--len', '1500', '--interface', 'eth0']
+        launch_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        out, err = launch_p.communicate(cmd)
+
+        retcode = launch_p.wait()
+        if retcode != 0:
+            logger.error('return code %s from %s, out="%s", err="%s", failed joiner launch' % (retcode, cmd, out, err))
+            return None
+        '''
+        live_sg = LiveSG(gw, source, group, expire_time)
+        live_sg.join_p = join_p
+        gw.live_sgs[sg] = live_sg
+        self.live_sgs[sg] = live_sg
+        return live_sg
+
+    def stop_gw(self, gw):
+        global logger, dkr_cmd
+
+        logger.info('stopping gw %s' % gw)
+        cmd = [dkr_cmd, 'container', 'stop', gw.contname]
+        stopret = subprocess.run(cmd)
+        logger.info('stopped container: %s' % (stopret))
+
+        del(self.live_gateways[gw.relay_ip])
+
+    def stop_sg(self, sg):
+        global logger, dkr_cmd
+        # global upstream_neighbor_ip
+
+        logger.info('stopping sg %s' % (sg,))
+
+        source, group = sg.source, sg.group
+
+        source = ipaddress.ip_address(source)
+        group = ipaddress.ip_address(group)
+
+        '''
+        cmd = ['/usr/sbin/smcroutectl', 'leave', self.native_ifname,
+                str(source), str(group)]
+        logger.info('running %s' % (' '.join(cmd)))
+        launch_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+        out, err = launch_p.communicate()
+        '''
+
+        '''
+        # the second old way was to launch igmp join inside frr, but now
+        # I want to do it without frr, so I use smcroutectl instead.
+
+        cmd = ['/usr/bin/vtysh']
+        in_stdio = "config term\ninterface eth1\nno ip igmp join %s %s\nexit\nexit\n" % (group, source)
+        logger.info('running %s <<EOF\n%sEOF' % (' '.join(cmd), in_stdio))
+        launch_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, universal_newlines=True)
+        out, err = launch_p.communicate(input=in_stdio)
+        '''
+
+        '''
+        cmd = [dkr_cmd, 'container', 'stop', sg.contname]
+        stopret = subprocess.run(cmd)
+        logger.info('stopped container: %s' % (stopret))
+        '''
+
+        gw = sg.gw
+        ip_sg = (sg.source, sg.group)
+        if ip_sg not in self.live_sgs:
+            logger.error('internal error: %s not in self.live_sgs in stop_sg' % (ip_sg,))
+        else:
+            live_sg = self.live_sgs[ip_sg]
+            if live_sg.join_p:
+                live_sg.join_p.send_signal(signal.SIGTERM)
+                live_sg.join_p.kill()
+            del(self.live_sgs[ip_sg])
+
+        if ip_sg not in gw.live_sgs:
+            logger.error('internal error: %s not in gw.live_sgs in stop_sg' % (ip_sg,))
+        else:
+            logger.info('removing %s from gw %s' % (sg, gw))
+            del(gw.live_sgs[ip_sg])
+            other_sg = None
+            for other in gw.live_sgs.values():
+                if other.source == sg.source:
+                    other_sg = other
+                    break
+            if other_sg:
+                logger.info('source %s stays alive for other sg %s' % (sg.source, other_sg))
+            else:
+                if sg.source in self.relay_ips:
+                    logger.info('source %s removed from relay_ips (%s)' % (sg.source, self.relay_ips[sg.source]))
+                    del(self.relay_ips[sg.source])
+
+                    '''
+                    # this logic is not needed if not sending data
+                    # traffic thru the frr instance
+                    logger.info('removing rpf route for %s' % (sg.source,))
+                    cmd = ['/usr/bin/vtysh']
+                    in_stdio = "config term\nno ip route %s/32 %s\nexit\n" % (sg.source, upstream_neighbor_ip)
+                    launch_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, universal_newlines=True)
+                    out, err = launch_p.communicate(input=in_stdio)
+                    retcode = launch_p.wait()
+                    if retcode != 0:
+                        logger.error('return code %s from %s removing route to source failed, out="%s", err="%s", failed joiner launch' % (retcode, cmd, out, err))
+                    '''
+                else:
+                    logger.error('internal error: source %s not in relay_ips during stop_sg(%s)' % (sg.source, sg))
+            if len(gw.live_sgs) == 0:
+                logger.info('shutting down gw %s with no more sgs' % (gw))
+                self.stop_gw(gw)
+            else:
+                logger.info('gw stays alive for %s' % (gw.live_sgs))
+
+    def add_or_refresh_sg(self, sg, notice_time, hold_time):
+        #global upstream_neighbor_ip
+
+        # TBD: grace period if we took too long, maybe not just notice+hold
+        expire_time = notice_time + hold_time
+        live_sg = self.live_sgs.get(sg)
+        if live_sg:
+            logger.info('live sg refreshed: %s' % (live_sg))
+            live_sg.expire_time = expire_time
+            return
+
+        src_ip, grp_ip = sg
+        logger.info('adding new sg: %s->%s' % (src_ip, grp_ip))
+
+        relay_ip = self.relay_ips.get(src_ip)
+        relay_opt = None
+        gw = None
+        while not live_sg:
+            if not relay_ip:
+                logger.info('finding relay ip for %s' % src_ip)
+                relay_opt = self.find_relay(src_ip)
+                if not relay_opt:
+                    logger.error('failed to add relay for %s' % (sg,))
+                    return
+                if not relay_opt.ip:
+                    logger.error('internal error: no ip for relay %s, for %s' % (relay_opt.value, sg))
+                    self.bad_relays[relay_opt.value] = datetime.datetime.now()
+                    continue
+                relay_ip = relay_opt.ip
+                self.relay_ips[src_ip] = relay_ip
+                logger.info('found relay ip %s for src %s' % (relay_ip, src_ip))
+
+                '''
+                # this logic is not needed if not sending data thru the
+                # frr instance.
+                logger.info('adding rpf route for %s' % (src_ip,))
+                cmd = ['/usr/bin/vtysh']
+                in_stdio = "config term\nip route %s/32 %s\nexit\n" % (src_ip, upstream_neighbor_ip)
+                launch_p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, universal_newlines=True)
+                out, err = launch_p.communicate(input=in_stdio)
+                retcode = launch_p.wait()
+                if retcode != 0:
+                    logger.error('return code %s from %s removing route to source failed, out="%s", err="%s", failed joiner launch' % (retcode, cmd, out, err))
+                '''
+
+            gw = self.live_gateways.get(relay_ip)
+            if not gw:
+                gw = self.launch_gateway(relay_ip)
+                if not gw:
+                    logger.error('failed to add live gateway for relay %s' % (relay_ip))
+                    del(self.relay_ips[src_ip])
+                    if not relay_opt:
+                        logger.error('internal error: unexpectedly have a relay_ip %s for non-live gw without having just made it' % (relay_ip))
+                        relay_ip = None
+                        continue
+                    self.bad_relays[relay_opt.value] = datetime.datetime.now()
+                    relay_ip = None
+                    continue
+
+            if sg in gw.live_sgs:
+                logger.error('internal error: sg %s in gateway %s but not channelmgr, added to list' % (sg, gw))
+                live_sg = gw.live_sgs[sg]
+                self.live_sgs[sg] = live_sg
+                continue
+
+            live_sg = self.launch_sg_join(sg, gw, expire_time)
+            if not live_sg:
+                logger.error('failed to launch sg %s' % (sg,))
+                if len(gw.live_sgs) == 0:
+                    logger.info('shutting down empty gateway')
+                    self.stop_gw(gw)
+                    return
+
+    def remove_sg(self, sg):
+        live_sg = self.live_sgs.get(sg)
+        if not live_sg:
+            logger.info('ignored pruning non-live sg: %s' % (sg,))
+            return
+        logger.info('removing live sg: %s' % (live_sg))
+        self.stop_sg(live_sg)
+
+
+def setup_logger(name, verbosity=0):
+    log_level = logging.WARNING
+    if verbosity > 1:
+        log_level = logging.DEBUG
+    elif verbosity > 0:
+        log_level = logging.INFO
+
+    # python logging wtf: logger.setLevel doesn't work the obvious way:
+    # https://stackoverflow.com/a/59705351/3427357 (-jake 2020-07)
+    handler = logging.StreamHandler()
+    #formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter('%(asctime)s[%(levelname)s]: %(message)s')
+    handler.setFormatter(formatter)
+    _logger = logging.getLogger(name)
+    _logger.addHandler(handler)
+    _logger.setLevel(log_level)
+    return _logger
+
+
+def on_created_handler(channels, control_file):
+    def on_created(event):
+        global logger
+        logger.debug(f'on_created({event})')
+        if event.src_path.endswith(control_file):
+            read_joinfile(event.src_path, channels)
+    return on_created
+
+def on_moved_handler(channels, control_file):
+    def on_moved(event):
+        global logger
+        logger.debug(f'on_moved({event})')
+        if event.dest_path.endswith(control_file):
+            read_joinfile(event.dest_path, channels)
+    return on_moved
+
+def on_modified_handler(channels, control_file):
+    def on_modified(event):
+        global logger
+        logger.debug(f'on_modified({event})')
+        if event.src_path.endswith(control_file):
+            read_joinfile(event.src_path, channels)
+    return on_modified
+
+def read_joinfile(fname, channels):
+    global logger
+    sgs = set()
+    with open(fname) as f:
+        line_num = 0
+        for in_line in f:
+            line = in_line.strip()
+            line_num += 1
+            if not line:
+                continue
+            if line.startswith('#'):
+                continue
+            sg = tuple(v.strip() for v in line.split(','))
+            try:
+                assert(len(sg) == 2)
+                src = ipaddress.ip_address(sg[0])
+                grp = ipaddress.ip_address(sg[1])
+                assert(grp.is_multicast)
+            except Exception as e:
+                logger.warning(f'{fname}:{line_num}: expected comma-separated ips: {line} ({str(e)}')
+                continue
+            sgs.add((src, grp))
+
+    removes = channels.last_sg_set - sgs
+    for sg in removes:
+        channels.remove_sg(sg)
+
+    now = datetime.datetime.now()
+    hold_time = datetime.timedelta(seconds=160)
+    for sg in sgs:
+        channels.add_or_refresh_sg(sg, now, hold_time)
+
+    if channels.last_sg_set != sgs:
+        channels.last_sg_set = sgs
+
+
+def main(args_in):
+    global logger, mcast_nwname, amt_bridge_nwname
+
+    parser = argparse.ArgumentParser(
+        description='''This operates in conjunction with mnat-ingress.
+It's intended to monitor the control-file for actively joined (S,G)s
+and launch/teardown amtgw instances, plus signaling group membership
+with smcroutectl.
+''')
+
+    parser.add_argument('-v', '--verbose', action='count', default=0)
+    parser.add_argument('-a', '--amt', required=True,
+        help='The docker network name that can send and receive UDP to the internet to reach a remote AMT relay (should be a bridge or macvlan to the internet)')
+    parser.add_argument('-n', '--native', required=True,
+        help='The docker network name that processes native multicast traffic coming from the local AMT gateway instances (should be a macvlan)')
+    parser.add_argument('-f', '--control-file',
+        default='ingest-control.joined-sgs',
+        help='provide the full path here, the (S,G)s that are joined are dumped into this file according to polled changes in the output of cmd.  Each line is "sourceip,groupip" (no quotes)')
+
+    #global self_ip
+    # global upstream_neighbor_ip
+    args = parser.parse_args(args_in[1:])
+    logger = setup_logger('ingest-mgr', args.verbose)
+
+    mcast_nwname = args.native
+    amt_bridge_nwname = args.amt
+    dnsserver = None
+
+    full_control_path = abspath(args.control_file)
+    watch_dir = dirname(full_control_path)
+    control_name = basename(full_control_path)
+    
+    #self_ip = args[2]
+
+    # upstream_neighbor_ip = args[3]
+
+    logger.info(f'started ingest-mgr: {args}')
+    #logger.info('started pimwatch, ifname=%s, upstream neighbor=%s, self_ip=%s' % (ifname, upstream_neighbor_ip, self_ip))
+    channels = ChannelManager('TBD-rm-ifname')
+    #channels = ChannelManager(args.interface)
+    ret = channels.check_pre_existing()
+    if ret != 0:
+        logger.error('prerequisites check failed')
+        exit(ret)
+
+    if isfile(full_control_path):
+        read_joinfile(full_control_path, channels)
+
+    event_handler = PatternMatchingEventHandler(
+            patterns=['*'],
+            ignore_patterns=None,
+            ignore_directories=True,
+            case_sensitive=True)
+
+    event_handler.on_created = on_created_handler(channels, control_name)
+    event_handler.on_moved = on_moved_handler(channels, control_name)
+    event_handler.on_modified = on_modified_handler(channels, control_name)
+
+    logger.info(f'watching {watch_dir}/{control_name}')
+    observer = Observer()
+    observer.schedule(event_handler, watch_dir, recursive=False)
+    observer.start()
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        pass
+    observer.stop()
+    observer.join()
+
+    return 0
+
+if __name__=="__main__":
+    retval = main(sys.argv)
+    sys.exit(retval)
+
