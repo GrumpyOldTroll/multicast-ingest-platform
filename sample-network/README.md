@@ -1,4 +1,4 @@
-# Intro
+# Sample Network Setup
 
 This subdirectory contains scripts to build a small and cheap but
 functional physical network that's compatible with the multicast
