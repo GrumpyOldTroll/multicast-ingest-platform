@@ -176,7 +176,7 @@ sudo docker network create --driver macvlan \
     --opt parent=${IFACE} downstream-mcast
 
 # to improve performance of the first join, pull the amtgw image:
-sudo docker pull grumpyoldtroll/amtgw:${INGEST_VERSION}
+sudo docker pull grumpyoldtroll/amtgw:0.0.4
 ~~~
 
 ## Running Containers
