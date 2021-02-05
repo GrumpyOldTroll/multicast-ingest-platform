@@ -1,0 +1,171 @@
+watcher=watch_container for user@10.9.1.3 on pimwatch
+watcher: at 2021-02-03 16:04:24 on user@10.9.1.3, running: sudo stdbuf -oL -eL docker logs --since 1s -f pimwatch
+cbacc=watch_container for user@10.9.1.3 on cbacc
+cbacc: at 2021-02-03 16:04:24 on user@10.9.1.3, running: sudo stdbuf -oL -eL docker logs --since 1s -f cbacc
+driad=watch_container for user@10.9.1.3 on driad-mgr
+driad: at 2021-02-03 16:04:24 on user@10.9.1.3, running: sudo stdbuf -oL -eL docker logs --since 1s -f driad-mgr
+driad-nocb=watch_container for user@10.9.1.3 on driad-nocb
+driad-nocb: at 2021-02-03 16:04:24 on user@10.9.1.3, running: sudo stdbuf -oL -eL docker logs --since 1s -f driad-nocb
+acc-igmp: at 2021-02-03 16:04:24 on user@10.7.1.1, running: sudo stdbuf -oL -eL tcpdump -i xdn0 -n -vvv igmp
+amt=watch_amt for user@10.9.1.3 on irf0
+amt: at 2021-02-03 16:04:24 on user@10.9.1.3, running: sudo stdbuf -oL -eL tcpdump -i irf0 -c 40 -n udp port 2268
+traffic-in=watch_traffic for user@10.9.1.3 on irf0
+traffic-in: at 2021-02-03 16:04:24 on user@10.9.1.3, running: sudo stdbuf -oL -eL tcpdump -i irf0 -c 10 -n udp and net 224.0.0.0/4
+traffic-acc=watch_traffic for user@10.7.1.1 on xdn0
+traffic-acc: at 2021-02-03 16:04:24 on user@10.7.1.1, running: sudo stdbuf -oL -eL tcpdump -i xdn0 -c 10 -n udp and net 224.0.0.0/4
+pids of watchers: 1391711 1391714 1391717 1391720 1391723 1391726 1391729 1391732
+traffic-acc  16:04:26 2021-02-04 00:04:26
+acc-igmp     16:04:26 2021-02-04 00:04:26
+traffic-acc  16:04:26 tcpdump: verbose output suppressed, use -v or -vv for full protocol decode
+traffic-acc  16:04:26 listening on xdn0, link-type EN10MB (Ethernet), capture size 262144 bytes
+acc-igmp     16:04:26 tcpdump: listening on xdn0, link-type EN10MB (Ethernet), capture size 262144 bytes
+cbacc        16:04:27 2021-02-04 00:04:27
+traffic-in   16:04:27 2021-02-04 00:04:27
+driad        16:04:27 2021-02-04 00:04:27
+watcher      16:04:27 2021-02-04 00:04:27
+driad-nocb   16:04:27 2021-02-04 00:04:27
+traffic-in   16:04:27 tcpdump: verbose output suppressed, use -v or -vv for full protocol decode
+traffic-in   16:04:27 listening on irf0, link-type EN10MB (Ethernet), capture size 262144 bytes
+amt          16:04:27 2021-02-04 00:04:27
+amt          16:04:27 tcpdump: verbose output suppressed, use -v or -vv for full protocol decode
+amt          16:04:27 listening on irf0, link-type EN10MB (Ethernet), capture size 262144 bytes
+watcher      16:04:32 00:04:32.038 Received PIM JOIN/PRUNE from 10.9.1.1 on eth0
+watcher      16:04:32 00:04:32.038 Received PIM JOIN from 10.9.1.1 to group 232.1.1.1 for source 23.212.185.4 on eth0
+watcher      16:04:32 00:04:32.038 move_kernel_cache: SG
+watcher      16:04:32 00:04:32.038 move_kernel_cache: SG
+watcher      16:04:32 00:04:32.039 Added kernel MFC entry src 23.212.185.4 grp 232.1.1.1 from eth1 to eth0
+acc-igmp     16:04:32 00:04:32.026725 IP (tos 0xc0, ttl 1, id 0, offset 0, flags [DF], proto IGMP (2), length 44, options (RA))
+acc-igmp     16:04:32     10.7.1.56 > 224.0.0.22: igmp v3 report, 1 group record(s) [gaddr 232.1.1.1 allow { 23.212.185.4 }]
+acc-igmp     16:04:33 00:04:32.926817 IP (tos 0xc0, ttl 1, id 0, offset 0, flags [DF], proto IGMP (2), length 44, options (RA))
+acc-igmp     16:04:33     10.7.1.56 > 224.0.0.22: igmp v3 report, 1 group record(s) [gaddr 232.1.1.1 allow { 23.212.185.4 }]
+watcher      16:04:35 00:04:35.101 For src 169.254.0.1, iif is 1, next hop router is 169.254.0.1: NOT A PIM ROUTER
+watcher      16:04:35 00:04:35.103 Received PIM JOIN/PRUNE from 10.9.1.1 on eth0
+watcher      16:04:35 00:04:35.103 Received PIM JOIN from 10.9.1.1 to group 232.1.1.1 for source 23.212.185.4 on eth0
+watcher      16:04:35 2021-02-04 00:04:35,186[INFO]: adding new sg: 23.212.185.4->232.1.1.1
+watcher      16:04:35 2021-02-04 00:04:35,189[INFO]: launching join for (IPv4Address('23.212.185.4'), IPv4Address('232.1.1.1'))
+watcher      16:04:35 2021-02-04 00:04:35,196[INFO]: live sg refreshed: 23.212.185.4->232.1.1.1
+cbacc        16:04:35 2021-02-04 00:04:35,197[INFO]: got sgs update: {(IPv4Address('23.212.185.4'), IPv4Address('232.1.1.1'))}
+cbacc        16:04:35 2021-02-04 00:04:35,738[INFO]: fetching cbacc info with https://disrupt-dorms.edgesuite.net/restconf/data/ietf-dorms:metadata/sender=23.212.185.4/group=232.1.1.1/ietf-cbacc:cbacc
+cbacc        16:04:35 2021-02-04 00:04:35,782[INFO]: none blocked (1 flows with 0.00191mb) active and (0) held down from prior block: set()
+driad        16:04:35 2021-02-04 00:04:35,787[INFO]: adding new sg: 23.212.185.4->232.1.1.1
+driad        16:04:35 2021-02-04 00:04:35,788[INFO]: finding relay ip for 23.212.185.4
+driad        16:04:35 2021-02-04 00:04:35,908[INFO]: found relay option prec=16,d=0,typ=3,val=r4v4.amt.akadns.net.
+driad        16:04:35 2021-02-04 00:04:35,909[INFO]: randomly chose idx 0 of 1 relay options
+driad        16:04:36 2021-02-04 00:04:36,038[INFO]: found relay ip 13.56.226.127 for src 23.212.185.4
+driad        16:04:36 2021-02-04 00:04:36,039[INFO]: launching gateway to relay 13.56.226.127
+driad        16:04:36 2021-02-04 00:04:36,039[INFO]: running: /usr/bin/docker create --rm --name ingest-gw-13.56.226.127 --privileged --log-opt max-size=2m --log-opt max-file=5 --network amt-bridge grumpyoldtroll/amtgw:0.0.4 13.56.226.127
+driad        16:04:36 2021-02-04 00:04:36,332[INFO]: running: /usr/bin/docker network connect mcast-native-ingest ingest-gw-13.56.226.127
+driad        16:04:37 2021-02-04 00:04:37,531[INFO]: running: /usr/bin/docker start ingest-gw-13.56.226.127
+driad        16:04:38 2021-02-04 00:04:38,881[INFO]: launching join for (IPv4Address('23.212.185.4'), IPv4Address('232.1.1.1'))
+driad        16:04:38 2021-02-04 00:04:38,882[INFO]: running /usr/bin/stdbuf -oL -eL /bin/ssm-stay-joined 23.212.185.4 232.1.1.1 65534
+watcher      16:04:38 00:04:38.906 Added kernel MFC entry src 23.212.185.4 grp 232.1.1.1 from eth1 to eth0
+watcher      16:04:38 00:04:38.906 move_kernel_cache: SG
+watcher      16:04:38 00:04:38.907 Added kernel MFC entry src 23.212.185.4 grp 232.1.1.1 from eth1 to eth0
+watcher      16:04:38 00:04:38.907 delete_mrtentry_all_kernel_cache: SG
+watcher      16:04:38 00:04:38.908 Removed MFC entry src 23.212.185.4, grp 232.1.1.1
+watcher      16:04:40 00:04:40.526 move_kernel_cache: SG
+watcher      16:04:40 00:04:40.526 Added kernel MFC entry src 23.212.185.4 grp 232.1.1.1 from eth1 to eth0, pimreg
+traffic-in   16:04:40 00:04:40.526740 IP 23.212.185.4.5001 > 232.1.1.1.5001: UDP, length 125
+amt          16:04:40 00:04:39.948315 IP 10.9.1.3.59526 > 13.56.226.127.2268: UDP, length 8
+amt          16:04:40 00:04:39.983137 IP 13.56.226.127.2268 > 10.9.1.3.59526: UDP, length 12
+amt          16:04:40 00:04:39.984126 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 8
+amt          16:04:40 00:04:39.984282 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 8
+amt          16:04:40 00:04:40.011496 IP 13.56.226.127.2268 > 10.9.1.3.41265: UDP, length 44
+amt          16:04:40 00:04:40.011499 IP 13.56.226.127.2268 > 10.9.1.3.41265: UDP, length 44
+amt          16:04:40 00:04:40.012415 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 60
+amt          16:04:40 00:04:40.012623 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 72
+amt          16:04:40 00:04:40.143326 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 8
+amt          16:04:40 00:04:40.171184 IP 13.56.226.127.2268 > 10.9.1.3.41265: UDP, length 44
+amt          16:04:40 00:04:40.171963 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 56
+amt          16:04:40 00:04:40.271085 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 8
+amt          16:04:40 00:04:40.295596 IP 13.56.226.127.2268 > 10.9.1.3.41265: UDP, length 44
+amt          16:04:40 00:04:40.296264 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 72
+amt          16:04:40 00:04:40.522767 IP 13.56.226.127.2268 > 10.9.1.3.41265: UDP, length 155
+traffic-acc  16:04:41 00:04:40.523571 IP 23.212.185.4.5001 > 232.1.1.1.5001: UDP, length 125
+traffic-in   16:04:41 00:04:41.533010 IP 23.212.185.4.5001 > 232.1.1.1.5001: UDP, length 125
+amt          16:04:41 00:04:41.532009 IP 13.56.226.127.2268 > 10.9.1.3.41265: UDP, length 155
+traffic-acc  16:04:42 00:04:41.529814 IP 23.212.185.4.5001 > 232.1.1.1.5001: UDP, length 125
+traffic-in   16:04:42 00:04:42.527652 IP 23.212.185.4.5001 > 232.1.1.1.5001: UDP, length 125
+amt          16:04:42 00:04:42.142961 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 8
+amt          16:04:42 00:04:42.170490 IP 13.56.226.127.2268 > 10.9.1.3.41265: UDP, length 44
+amt          16:04:42 00:04:42.170846 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 52
+amt          16:04:42 00:04:42.526653 IP 13.56.226.127.2268 > 10.9.1.3.41265: UDP, length 155
+amt          16:04:42 00:04:42.767169 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 8
+amt          16:04:42 00:04:42.798449 IP 13.56.226.127.2268 > 10.9.1.3.41265: UDP, length 44
+amt          16:04:42 00:04:42.799245 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 52
+traffic-acc  16:04:43 00:04:42.524480 IP 23.212.185.4.5001 > 232.1.1.1.5001: UDP, length 125
+traffic-in   16:04:43 00:04:43.523519 IP 23.212.185.4.5001 > 232.1.1.1.5001: UDP, length 125
+amt          16:04:44 00:04:43.522472 IP 13.56.226.127.2268 > 10.9.1.3.41265: UDP, length 155
+amt          16:04:44 00:04:43.675138 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 8
+amt          16:04:44 00:04:43.698360 IP 13.56.226.127.2268 > 10.9.1.3.41265: UDP, length 44
+amt          16:04:44 00:04:43.699281 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 52
+amt          16:04:44 00:04:43.742881 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 8
+amt          16:04:44 00:04:43.770595 IP 13.56.226.127.2268 > 10.9.1.3.41265: UDP, length 44
+amt          16:04:44 00:04:43.771175 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 52
+traffic-acc  16:04:44 00:04:43.520500 IP 23.212.185.4.5001 > 232.1.1.1.5001: UDP, length 125
+traffic-in   16:04:44 00:04:44.528613 IP 23.212.185.4.5001 > 232.1.1.1.5001: UDP, length 125
+amt          16:04:45 00:04:44.238893 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 8
+amt          16:04:45 00:04:44.262409 IP 13.56.226.127.2268 > 10.9.1.3.41265: UDP, length 44
+amt          16:04:45 00:04:44.262984 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 88
+amt          16:04:45 00:04:44.527600 IP 13.56.226.127.2268 > 10.9.1.3.41265: UDP, length 155
+traffic-acc  16:04:45 00:04:44.525413 IP 23.212.185.4.5001 > 232.1.1.1.5001: UDP, length 125
+traffic-in   16:04:45 00:04:45.527940 IP 23.212.185.4.5001 > 232.1.1.1.5001: UDP, length 125
+amt          16:04:46 00:04:45.526895 IP 13.56.226.127.2268 > 10.9.1.3.41265: UDP, length 155
+traffic-acc  16:04:46 00:04:45.524462 IP 23.212.185.4.5001 > 232.1.1.1.5001: UDP, length 125
+traffic-acc  16:04:46 00:04:46.526228 IP 23.212.185.4.5001 > 232.1.1.1.5001: UDP, length 125
+traffic-in   16:04:46 00:04:46.529293 IP 23.212.185.4.5001 > 232.1.1.1.5001: UDP, length 125
+watcher      16:04:46 00:04:46.991 delete_mrtentry_all_kernel_cache: SG
+watcher      16:04:46 00:04:46.991 Removed MFC entry src 23.212.185.4, grp 232.1.1.1
+amt          16:04:47 00:04:46.528084 IP 13.56.226.127.2268 > 10.9.1.3.41265: UDP, length 155
+watcher      16:04:47 00:04:47.528 move_kernel_cache: SG
+watcher      16:04:47 00:04:47.528 Added kernel MFC entry src 23.212.185.4 grp 232.1.1.1 from eth1 to eth0, pimreg
+traffic-acc  16:04:47 00:04:47.525754 IP 23.212.185.4.5001 > 232.1.1.1.5001: UDP, length 125
+traffic-in   16:04:47 00:04:47.528754 IP 23.212.185.4.5001 > 232.1.1.1.5001: UDP, length 125
+amt          16:04:48 00:04:47.527114 IP 13.56.226.127.2268 > 10.9.1.3.41265: UDP, length 155
+traffic-acc  16:04:48 00:04:48.523745 IP 23.212.185.4.5001 > 232.1.1.1.5001: UDP, length 125
+traffic-in   16:04:48 00:04:48.527305 IP 23.212.185.4.5001 > 232.1.1.1.5001: UDP, length 125
+amt          16:04:49 00:04:48.526415 IP 13.56.226.127.2268 > 10.9.1.3.41265: UDP, length 155
+amt          16:04:49 00:04:48.975256 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 8
+amt          16:04:49 00:04:49.003497 IP 13.56.226.127.2268 > 10.9.1.3.41265: UDP, length 44
+amt          16:04:49 40 packets captured
+amt          16:04:49 42 packets received by filter
+amt          16:04:49 0 packets dropped by kernel
+driad        16:04:49 02-04 00:04:49: joined to 23.212.185.4->232.1.1.1 for 11s
+traffic-acc  16:04:49 00:04:49.530544 IP 23.212.185.4.5001 > 232.1.1.1.5001: UDP, length 125
+traffic-acc  16:04:49 10 packets captured
+traffic-acc  16:04:49 12 packets received by filter
+traffic-acc  16:04:49 0 packets dropped by kernel
+traffic-in   16:04:49 00:04:49.533610 IP 23.212.185.4.5001 > 232.1.1.1.5001: UDP, length 125
+traffic-in   16:04:49 10 packets captured
+traffic-in   16:04:49 11 packets received by filter
+traffic-in   16:04:49 0 packets dropped by kernel
+watcher      16:04:55 00:04:55.527 For src 169.254.0.1, iif is 1, next hop router is 169.254.0.1: NOT A PIM ROUTER
+acc-igmp     16:04:59 00:04:59.534495 IP (tos 0xc0, ttl 1, id 0, offset 0, flags [DF], proto IGMP (2), length 44, options (RA))
+acc-igmp     16:04:59     10.7.1.56 > 224.0.0.22: igmp v3 report, 1 group record(s) [gaddr 232.1.1.1 block { 23.212.185.4 }]
+acc-igmp     16:04:59 00:04:59.534960 IP (tos 0xc0, ttl 1, id 22092, offset 0, flags [DF], proto IGMP (2), length 40, options (RA))
+acc-igmp     16:04:59     10.7.1.1 > 232.1.1.1: igmp query v3 [max resp time 1.0s] [gaddr 232.1.1.1 { 23.212.185.4 }]
+driad        16:05:00 02-04 00:05:00: joined to 23.212.185.4->232.1.1.1 for 22s
+acc-igmp     16:05:00 00:04:59.966775 IP (tos 0xc0, ttl 1, id 0, offset 0, flags [DF], proto IGMP (2), length 44, options (RA))
+acc-igmp     16:05:00     10.7.1.56 > 224.0.0.22: igmp v3 report, 1 group record(s) [gaddr 232.1.1.1 block { 23.212.185.4 }]
+acc-igmp     16:05:00 00:04:59.967191 IP (tos 0xc0, ttl 1, id 22180, offset 0, flags [DF], proto IGMP (2), length 40, options (RA))
+acc-igmp     16:05:00     10.7.1.1 > 232.1.1.1: igmp query v3 [max resp time 1.0s] [gaddr 232.1.1.1 { 23.212.185.4 }]
+watcher      16:05:01 00:05:01.542 Received PIM JOIN/PRUNE from 10.9.1.1 on eth0
+watcher      16:05:01 00:05:01.542 Received PIM PRUNE from 10.9.1.1 to group 232.1.1.1 for source 23.212.185.4 on eth0
+watcher      16:05:01 00:05:01.542 find_route: exact (S,G) entry for (23.212.185.4,232.1.1.1) found
+watcher      16:05:05 2021-02-04 00:05:05,904[INFO]: removing live sg: 23.212.185.4->232.1.1.1
+watcher      16:05:05 2021-02-04 00:05:05,906[INFO]: stopping sg 23.212.185.4->232.1.1.1
+cbacc        16:05:05 2021-02-04 00:05:05,912[INFO]: got sgs update: set()
+cbacc        16:05:05 2021-02-04 00:05:05,912[INFO]: none blocked (0 flows with 0mb) active and (0) held down from prior block: set()
+cbacc        16:05:05 2021-02-04 00:05:05,915[INFO]: got sgs update: set()
+cbacc        16:05:05 2021-02-04 00:05:05,915[INFO]: none blocked (0 flows with 0mb) active and (0) held down from prior block: set()
+driad        16:05:05 2021-02-04 00:05:05,916[INFO]: removing live sg: 23.212.185.4->232.1.1.1
+driad        16:05:05 2021-02-04 00:05:05,917[INFO]: stopping sg 23.212.185.4->232.1.1.1
+driad        16:05:05 2021-02-04 00:05:05,918[INFO]: removing 23.212.185.4->232.1.1.1 from gw gw(13.56.226.127):1
+driad        16:05:05 2021-02-04 00:05:05,918[INFO]: source 23.212.185.4 removed from relay_ips (13.56.226.127)
+driad        16:05:05 2021-02-04 00:05:05,918[INFO]: shutting down gw gw(13.56.226.127):0 with no more sgs
+driad        16:05:05 2021-02-04 00:05:05,918[INFO]: stopping gw gw(13.56.226.127):0
+watcher      16:05:12 00:05:12.673 find_route: (S,G) entry for (0.0.0.0,232.1.1.1) *not* found
+watcher      16:05:12 00:05:12.673 find_route: No SG|WC, return NULL
+watcher      16:05:15 00:05:15.663 For src 169.254.0.1, iif is 1, next hop router is 169.254.0.1: NOT A PIM ROUTER
+driad        16:05:16 ingest-gw-13.56.226.127
+driad        16:05:16 2021-02-04 00:05:16,869[INFO]: stopped container: CompletedProcess(args=['/usr/bin/docker', 'container', 'stop', 'ingest-gw-13.56.226.127'], returncode=0)

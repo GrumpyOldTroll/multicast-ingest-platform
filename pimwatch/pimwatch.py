@@ -90,7 +90,7 @@ def sg_joinprune_watch(ifname):
             continue
 
         if not in_pkt:
-            logger.debug('ignoring: %s' % line)
+            #logger.debug('ignoring: %s' % line)
             continue
 
         if expect_groups == 0:

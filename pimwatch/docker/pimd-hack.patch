@@ -1,0 +1,28 @@
+diff --git a/lib/tempfile.c b/lib/tempfile.c
+index dbe8bb6..328f08a 100644
+--- a/lib/tempfile.c
++++ b/lib/tempfile.c
+@@ -35,7 +35,7 @@
+  */
+ FILE *tempfile(void)
+ {
+-#ifdef O_TMPFILE	  /* Only on Linux, with fairly recent (G)LIBC */
++#if 0
+ 	mode_t oldmask;
+ 	int fd;
+ 
+diff --git a/src/mrt.c b/src/mrt.c
+index ca0df4b..f3b4794 100644
+--- a/src/mrt.c
++++ b/src/mrt.c
+@@ -221,7 +221,9 @@ mrtentry_t *find_route(uint32_t source, uint32_t group, uint16_t flags, char cre
+ 	if (!grp)
+ 	    return NULL;
+ 
+-	if (IN_PIM_SSM_RANGE(group)) {
++  //jake hack 2021-02-02: treat all groups as ssm here:
++	//if (IN_PIM_SSM_RANGE(group)) {
++	if (1) {
+ 	    if (rp_match(group) == (rpentry_t *) NULL) {
+ 		/* For SSM, virtual RP entry has to be created. RP is at local link 169.254.0.1
+ 		   to be sure not to send any register messages outside, although sending them

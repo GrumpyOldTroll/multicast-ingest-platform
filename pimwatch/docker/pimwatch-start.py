@@ -63,7 +63,9 @@ phyint eth1 enable
 
     if verbosity:
         watch_cmd.append(verbosity)
-        pim_cmd.extend(['--debug=neighbors,rpf,join-prune'])
+        # debug is too spammy, unfortunately.  rpf has 2 log lines per packet, and seems turned on regardless of the list passed.
+        pim_cmd.extend(['--debug=join-prune'])
+        # pim_cmd.extend(['--debug=neighbors,rpf,join-prune'])
 
     # this is needed as a workaround for:
     # https://github.com/docker/for-linux/issues/568
@@ -90,11 +92,6 @@ phyint eth1 enable
     if addrt_p.poll() != 0:
         print(f'error ({addrt_p.poll()}) in "{cmd_str}": out="{out}", err="{err}"')
         raise Exception(err)
-
-    if verbosity:
-        watch_cmd.append(verbosity)
-        # 'jp' does not work
-        pim_cmd.extend(['--debug=interfaces,join-prune,kernel,neighbors,rpf'])
 
     print(f'running: {" ".join(watch_cmd)}')
     watch_p = subprocess.Popen(watch_cmd)

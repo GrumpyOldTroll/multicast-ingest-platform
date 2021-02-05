@@ -1,0 +1,379 @@
+watcher=watch_container for user@10.9.1.3 on pimwatch
+cbacc=watch_container for user@10.9.1.3 on cbacc
+driad=watch_container for user@10.9.1.3 on driad-mgr
+acc-pim=watch_pim for user@10.7.1.1 on xup0
+ing-pim=watch_pim for user@10.9.1.3 on irf0
+amt=watch_amt for user@10.9.1.3 on irf0
+traffic-in=watch_traffic for user@10.9.1.3 on irf0
+traffic-acc=watch_traffic for user@10.7.1.1 on xdn0
+acc-pim      16:51:37 tcpdump: listening on xup0, link-type EN10MB (Ethernet), capture size 262144 bytes
+traffic-acc  16:51:37 tcpdump: verbose output suppressed, use -v or -vv for full protocol decode
+traffic-acc  16:51:37 listening on xdn0, link-type EN10MB (Ethernet), capture size 262144 bytes
+acc-igmp     16:51:37 tcpdump: listening on xdn0, link-type EN10MB (Ethernet), capture size 262144 bytes
+ing-pim      16:51:38 tcpdump: listening on irf0, link-type EN10MB (Ethernet), capture size 262144 bytes
+traffic-in   16:51:38 tcpdump: verbose output suppressed, use -v or -vv for full protocol decode
+traffic-in   16:51:38 listening on irf0, link-type EN10MB (Ethernet), capture size 262144 bytes
+amt          16:51:38 tcpdump: verbose output suppressed, use -v or -vv for full protocol decode
+amt          16:51:38 listening on irf0, link-type EN10MB (Ethernet), capture size 262144 bytes
+watcher      16:51:40 00:51:40.577 netlink: vif 1, ifindex=9
+watcher      16:51:40 00:51:40.577 For src 169.254.0.1, iif is 1, next hop router is 169.254.0.1: NOT A PIM ROUTER
+watcher      16:51:40 00:51:40.577 k_req_incoming: ask path to 23.212.185.5
+watcher      16:51:40 00:51:40.577 netlink: vif 1, ifindex=9
+watcher      16:51:40 00:51:40.679 Received PIM JOIN/PRUNE from 10.9.1.1 on eth0
+watcher      16:51:40 00:51:40.679 Received PIM JOIN from 10.9.1.1 to group 232.1.1.1 for source 23.212.185.5 on eth0
+watcher      16:51:40 00:51:40.679 k_req_incoming: ask path to 23.212.185.5
+watcher      16:51:40 00:51:40.679 netlink: vif 1, ifindex=9
+watcher      16:51:40 00:51:40.679 Added kernel MFC entry src 23.212.185.5 grp 232.1.1.1 from eth1 to eth0, pimreg
+watcher      16:51:40 00:51:40.680 move_kernel_cache: SG
+watcher      16:51:40 00:51:40.680 Added kernel MFC entry src 23.212.185.5 grp 232.1.1.1 from eth1 to eth0, pimreg
+ing-pim      16:51:40 00:51:40.678804 IP (tos 0xc0, ttl 1, id 10013, offset 0, flags [none], proto PIM (103), length 54)
+ing-pim      16:51:40     10.9.1.1 > 224.0.0.13: PIMv2, length 34
+ing-pim      16:51:40 	Join / Prune, cksum 0x1003 (correct), upstream-neighbor: 10.9.1.3
+ing-pim      16:51:40 	  1 group(s), holdtime: 3m30s
+ing-pim      16:51:40 	    group #1: 232.1.1.1, joined sources: 1, pruned sources: 0
+ing-pim      16:51:40 	      joined source #1: 23.212.185.5(S)
+acc-pim      16:51:40 00:51:40.675485 IP (tos 0xc0, ttl 1, id 3137, offset 0, flags [none], proto PIM (103), length 54)
+acc-pim      16:51:40     10.8.1.2 > 224.0.0.13: PIMv2, length 34
+acc-pim      16:51:40 	Join / Prune, cksum 0x1006 (correct), upstream-neighbor: 10.8.1.1
+acc-pim      16:51:40 	  1 group(s), holdtime: 3m30s
+acc-pim      16:51:40 	    group #1: 232.1.1.1, joined sources: 1, pruned sources: 0
+acc-pim      16:51:40 	      joined source #1: 23.212.185.5(S)
+acc-igmp     16:51:40 00:51:40.672586 IP (tos 0xc0, ttl 1, id 0, offset 0, flags [DF], proto IGMP (2), length 44, options (RA))
+acc-igmp     16:51:40     10.7.1.56 > 224.0.0.22: igmp v3 report, 1 group record(s) [gaddr 232.1.1.1 allow { 23.212.185.5 }]
+acc-igmp     16:51:41 00:51:41.344663 IP (tos 0xc0, ttl 1, id 0, offset 0, flags [DF], proto IGMP (2), length 44, options (RA))
+acc-igmp     16:51:41     10.7.1.56 > 224.0.0.22: igmp v3 report, 1 group record(s) [gaddr 232.1.1.1 allow { 23.212.185.5 }]
+watcher      16:52:00 00:52:00.702 Sending PIM HELLO on eth0
+watcher      16:52:00 00:52:00.703 Sending PIM HELLO on eth1
+watcher      16:52:00 00:52:00.703 netlink: vif 1, ifindex=9
+watcher      16:52:00 00:52:00.703 For src 169.254.0.1, iif is 1, next hop router is 169.254.0.1: NOT A PIM ROUTER
+watcher      16:52:00 00:52:00.703 k_req_incoming: ask path to 23.212.185.5
+watcher      16:52:00 00:52:00.704 netlink: vif 1, ifindex=9
+ing-pim      16:52:01 00:52:00.703188 IP (tos 0x0, ttl 1, id 39615, offset 0, flags [none], proto PIM (103), length 46)
+ing-pim      16:52:01     10.9.1.3 > 224.0.0.13: PIMv2, length 26
+ing-pim      16:52:01 	Hello, cksum 0x39ef (correct)
+ing-pim      16:52:01 	  Hold Time Option (1), length 2, Value: 1m45s
+ing-pim      16:52:01 	    0x0000:  0069
+ing-pim      16:52:01 	  DR Priority Option (19), length 4, Value: 1
+ing-pim      16:52:01 	    0x0000:  0000 0001
+ing-pim      16:52:01 	  Generation ID Option (20), length 4, Value: 0x6b0f3a65
+ing-pim      16:52:01 	    0x0000:  6b0f 3a65
+watcher      16:52:01 00:52:01.572 PIM HELLO holdtime from 10.9.1.1 is 105
+watcher      16:52:01 00:52:01.572 PIM DR PRIORITY from 10.9.1.1 is 1
+watcher      16:52:01 00:52:01.572 PIM GenID from 10.9.1.1 is 1539487375
+watcher      16:52:01 00:52:01.572 PIM HELLO holdtime from 172.19.0.2 is 105
+watcher      16:52:01 00:52:01.572 PIM DR PRIORITY from 172.19.0.2 is 1
+watcher      16:52:01 00:52:01.572 PIM GenID from 172.19.0.2 is 2039750873
+watcher      16:52:01 2021-01-28 00:52:01,989[DEBUG]: ignoring: DR Priority Option (19), length 4, Value: 1
+watcher      16:52:01 2021-01-28 00:52:01,990[DEBUG]: ignoring: 0x0000:  0000 0001
+watcher      16:52:01 2021-01-28 00:52:01,991[DEBUG]: ignoring: Generation ID Option (20), length 4, Value: 0x5bc2b68f
+watcher      16:52:01 2021-01-28 00:52:01,992[DEBUG]: ignoring: 0x0000:  5bc2 b68f
+watcher      16:52:01 2021-01-28 00:52:01,993[DEBUG]: ignoring: Address List Option (24), length 18, Value:
+watcher      16:52:01 2021-01-28 00:52:01,994[DEBUG]: ignoring: fe80::2e0:4cff:fe68:5ff
+watcher      16:52:01 2021-01-28 00:52:01,994[DEBUG]: ignoring: 0x0000:  0200 fe80 0000 0000 0000 02e0 4cff fe68
+watcher      16:52:01 2021-01-28 00:52:01,995[DEBUG]: ignoring: 0x0010:  05ff
+watcher      16:52:01 2021-01-28 00:52:01,996[DEBUG]: ignoring: 00:51:40.678804 IP (tos 0xc0, ttl 1, id 10013, offset 0, flags [none], proto PIM (103), length 54)
+watcher      16:52:01 2021-01-28 00:52:01,997[DEBUG]: ignoring: 10.9.1.1 > 224.0.0.13: PIMv2, length 34
+watcher      16:52:01 2021-01-28 00:52:01,999[DEBUG]: cleanly finished join/prune packet
+watcher      16:52:02 2021-01-28 00:52:02,000[DEBUG]: saw sg notice: "Joins[23.212.185.5->232.1.1.1]; Prunes[]"
+watcher      16:52:02 2021-01-28 00:52:02,001[INFO]: adding new sg: 23.212.185.5->232.1.1.1
+watcher      16:52:02 2021-01-28 00:52:02,001[INFO]: launching join for (IPv4Address('23.212.185.5'), IPv4Address('232.1.1.1'))
+cbacc        16:52:02 2021-01-28 00:52:02,004[INFO]: got sgs update: {(IPv4Address('23.212.185.5'), IPv4Address('232.1.1.1'))}
+cbacc        16:52:02 2021-01-28 00:52:02,004[INFO]: none blocked (1 flows with 0.00191mb) active and (0) held down from prior block: set()
+watcher      16:52:02 2021-01-28 00:52:02,003[DEBUG]: ignoring: 00:52:01.571628 IP (tos 0xc0, ttl 1, id 10014, offset 0, flags [none], proto PIM (103), length 76)
+watcher      16:52:02 2021-01-28 00:52:02,003[DEBUG]: ignoring: 10.9.1.1 > 224.0.0.13: PIMv2, length 56
+watcher      16:52:02 2021-01-28 00:52:02,003[DEBUG]: ignoring: Hello, cksum 0x6c61 (correct)
+cbacc        16:52:02 2021-01-28 00:52:02,006[INFO]: got sgs update: {(IPv4Address('23.212.185.5'), IPv4Address('232.1.1.1'))}
+watcher      16:52:02 2021-01-28 00:52:02,004[DEBUG]: ignoring: Hold Time Option (1), length 2, Value: 1m45s
+watcher      16:52:02 2021-01-28 00:52:02,004[DEBUG]: ignoring: 0x0000:  0069
+watcher      16:52:02 2021-01-28 00:52:02,004[DEBUG]: ignoring: LAN Prune Delay Option (2), length 4, Value:
+watcher      16:52:02 2021-01-28 00:52:02,004[DEBUG]: ignoring: T-bit=0, LAN delay 500ms, Override interval 2500ms
+watcher      16:52:02 2021-01-28 00:52:02,005[DEBUG]: ignoring: 0x0000:  01f4 09c4
+watcher      16:52:02 2021-01-28 00:52:02,005[DEBUG]: ignoring: DR Priority Option (19), length 4, Value: 1
+cbacc        16:52:02 2021-01-28 00:52:02,007[INFO]: none blocked (1 flows with 0.00191mb) active and (0) held down from prior block: set()
+driad        16:52:02 2021-01-28 00:52:02,030[INFO]: adding new sg: 23.212.185.5->232.1.1.1
+driad        16:52:02 2021-01-28 00:52:02,031[INFO]: finding relay ip for 23.212.185.5
+driad        16:52:02 2021-01-28 00:52:02,075[INFO]: found relay option prec=16,d=0,typ=3,val=r5v4.amt.akadns.net.
+driad        16:52:02 2021-01-28 00:52:02,076[INFO]: randomly chose idx 0 of 1 relay options
+driad        16:52:02 2021-01-28 00:52:02,170[INFO]: found relay ip 18.144.42.229 for src 23.212.185.5
+driad        16:52:02 2021-01-28 00:52:02,171[INFO]: launching gateway to relay 18.144.42.229
+driad        16:52:02 2021-01-28 00:52:02,172[INFO]: running: /usr/bin/docker create --rm --name ingest-gw-18.144.42.229 --privileged --log-opt max-size=2m --log-opt max-file=5 --network amt-bridge grumpyoldtroll/amtgw:0.0.4 18.144.42.229
+ing-pim      16:52:02 00:52:01.571628 IP (tos 0xc0, ttl 1, id 10014, offset 0, flags [none], proto PIM (103), length 76)
+ing-pim      16:52:02     10.9.1.1 > 224.0.0.13: PIMv2, length 56
+ing-pim      16:52:02 	Hello, cksum 0x6c61 (correct)
+ing-pim      16:52:02 	  Hold Time Option (1), length 2, Value: 1m45s
+ing-pim      16:52:02 	    0x0000:  0069
+ing-pim      16:52:02 	  LAN Prune Delay Option (2), length 4, Value: 
+ing-pim      16:52:02 	    T-bit=0, LAN delay 500ms, Override interval 2500ms
+ing-pim      16:52:02 	    0x0000:  01f4 09c4
+ing-pim      16:52:02 	  DR Priority Option (19), length 4, Value: 1
+ing-pim      16:52:02 	    0x0000:  0000 0001
+ing-pim      16:52:02 	  Generation ID Option (20), length 4, Value: 0x5bc2b68f
+ing-pim      16:52:02 	    0x0000:  5bc2 b68f
+ing-pim      16:52:02 	  Address List Option (24), length 18, Value: 
+ing-pim      16:52:02 	    fe80::2e0:4cff:fe68:5ff
+ing-pim      16:52:02 	    0x0000:  0200 fe80 0000 0000 0000 02e0 4cff fe68
+ing-pim      16:52:02 	    0x0010:  05ff
+acc-pim      16:52:02 00:52:01.572030 IP (tos 0xc0, ttl 1, id 10015, offset 0, flags [none], proto PIM (103), length 76)
+acc-pim      16:52:02     10.8.1.1 > 224.0.0.13: PIMv2, length 56
+acc-pim      16:52:02 	Hello, cksum 0x0ae4 (correct)
+acc-pim      16:52:02 	  Hold Time Option (1), length 2, Value: 1m45s
+acc-pim      16:52:02 	    0x0000:  0069
+acc-pim      16:52:02 	  LAN Prune Delay Option (2), length 4, Value: 
+acc-pim      16:52:02 	    T-bit=0, LAN delay 500ms, Override interval 2500ms
+acc-pim      16:52:02 	    0x0000:  01f4 09c4
+acc-pim      16:52:02 	  DR Priority Option (19), length 4, Value: 1
+acc-pim      16:52:02 	    0x0000:  0000 0001
+acc-pim      16:52:02 	  Generation ID Option (20), length 4, Value: 0x64450eb8
+acc-pim      16:52:02 	    0x0000:  6445 0eb8
+acc-pim      16:52:02 	  Address List Option (24), length 18, Value: 
+acc-pim      16:52:02 	    fe80::2e0:4cff:fe68:6d1
+acc-pim      16:52:02 	    0x0000:  0200 fe80 0000 0000 0000 02e0 4cff fe68
+acc-pim      16:52:02 	    0x0010:  06d1
+driad        16:52:02 2021-01-28 00:52:02,475[INFO]: running: /usr/bin/docker network connect mcast-native-ingest ingest-gw-18.144.42.229
+driad        16:52:03 2021-01-28 00:52:03,668[INFO]: running: /usr/bin/docker start ingest-gw-18.144.42.229
+driad        16:52:05 2021-01-28 00:52:05,012[INFO]: launching join for (IPv4Address('23.212.185.5'), IPv4Address('232.1.1.1'))
+driad        16:52:05 2021-01-28 00:52:05,013[INFO]: running /usr/bin/stdbuf -oL -eL /bin/ssm-stay-joined 23.212.185.5 232.1.1.1 65534
+driad        16:52:05 2021-01-28 00:52:05,022[INFO]: live sg refreshed: 23.212.185.5->232.1.1.1
+watcher      16:52:05 00:52:05.032 delete_mrtentry_all_kernel_cache: SG
+watcher      16:52:05 00:52:05.032 Removed MFC entry src 23.212.185.5, grp 232.1.1.1
+watcher      16:52:06 00:52:06.252 k_req_incoming: ask path to 23.212.185.5
+watcher      16:52:06 00:52:06.252 netlink: vif 1, ifindex=9
+watcher      16:52:06 00:52:06.252 move_kernel_cache: SG
+watcher      16:52:06 00:52:06.252 Added kernel MFC entry src 23.212.185.5 grp 232.1.1.1 from eth1 to eth0, pimreg
+traffic-in   16:52:06 00:52:06.252512 IP 23.212.185.5.5001 > 232.1.1.1.5001: UDP, length 125
+traffic-acc  16:52:06 00:52:06.254959 IP 23.212.185.5.5001 > 232.1.1.1.5001: UDP, length 125
+amt          16:52:06 00:52:06.074208 IP 10.9.1.3.58275 > 18.144.42.229.2268: UDP, length 8
+amt          16:52:06 00:52:06.100576 IP 18.144.42.229.2268 > 10.9.1.3.58275: UDP, length 12
+amt          16:52:06 00:52:06.101523 IP 10.9.1.3.48748 > 18.144.42.229.2268: UDP, length 8
+amt          16:52:06 00:52:06.101677 IP 10.9.1.3.48748 > 18.144.42.229.2268: UDP, length 8
+amt          16:52:06 00:52:06.101811 IP 10.9.1.3.48748 > 18.144.42.229.2268: UDP, length 8
+amt          16:52:06 00:52:06.127686 IP 18.144.42.229.2268 > 10.9.1.3.48748: UDP, length 44
+amt          16:52:06 00:52:06.127689 IP 18.144.42.229.2268 > 10.9.1.3.48748: UDP, length 44
+amt          16:52:06 00:52:06.127690 IP 18.144.42.229.2268 > 10.9.1.3.48748: UDP, length 44
+amt          16:52:06 00:52:06.128306 IP 10.9.1.3.48748 > 18.144.42.229.2268: UDP, length 60
+amt          16:52:06 00:52:06.128508 IP 10.9.1.3.48748 > 18.144.42.229.2268: UDP, length 60
+amt          16:52:06 00:52:06.128686 IP 10.9.1.3.48748 > 18.144.42.229.2268: UDP, length 72
+amt          16:52:06 00:52:06.248600 IP 18.144.42.229.2268 > 10.9.1.3.48748: UDP, length 155
+traffic-in   16:52:07 00:52:07.257379 IP 23.212.185.5.5001 > 232.1.1.1.5001: UDP, length 125
+traffic-acc  16:52:07 00:52:07.259784 IP 23.212.185.5.5001 > 232.1.1.1.5001: UDP, length 125
+amt          16:52:07 00:52:06.629519 IP 10.9.1.3.48748 > 18.144.42.229.2268: UDP, length 8
+amt          16:52:07 00:52:06.657129 IP 18.144.42.229.2268 > 10.9.1.3.48748: UDP, length 44
+amt          16:52:07 00:52:06.657624 IP 10.9.1.3.48748 > 18.144.42.229.2268: UDP, length 56
+amt          16:52:07 00:52:07.025020 IP 10.9.1.3.48748 > 18.144.42.229.2268: UDP, length 8
+amt          16:52:07 00:52:07.051842 IP 18.144.42.229.2268 > 10.9.1.3.48748: UDP, length 44
+amt          16:52:07 00:52:07.052404 IP 10.9.1.3.48748 > 18.144.42.229.2268: UDP, length 52
+amt          16:52:07 00:52:07.256542 IP 18.144.42.229.2268 > 10.9.1.3.48748: UDP, length 155
+traffic-in   16:52:08 00:52:08.232487 IP 23.212.185.5.5001 > 232.1.1.1.5001: UDP, length 125
+acc-pim      16:52:08 00:52:07.753198 IP (tos 0xc0, ttl 1, id 3138, offset 0, flags [none], proto PIM (103), length 76)
+acc-pim      16:52:08     10.8.1.2 > 224.0.0.13: PIMv2, length 56
+acc-pim      16:52:08 	Hello, cksum 0xf3de (correct)
+acc-pim      16:52:08 	  Hold Time Option (1), length 2, Value: 1m45s
+acc-pim      16:52:08 	    0x0000:  0069
+acc-pim      16:52:08 	  LAN Prune Delay Option (2), length 4, Value: 
+acc-pim      16:52:08 	    T-bit=0, LAN delay 500ms, Override interval 2500ms
+acc-pim      16:52:08 	    0x0000:  01f4 09c4
+acc-pim      16:52:08 	  DR Priority Option (19), length 4, Value: 1
+acc-pim      16:52:08 	    0x0000:  0000 0001
+acc-pim      16:52:08 	  Generation ID Option (20), length 4, Value: 0x622ded32
+acc-pim      16:52:08 	    0x0000:  622d ed32
+acc-pim      16:52:08 	  Address List Option (24), length 18, Value: 
+acc-pim      16:52:08 	    fe80::5e85:7eff:fe40:b3f5
+acc-pim      16:52:08 	    0x0000:  0200 fe80 0000 0000 0000 5e85 7eff fe40
+acc-pim      16:52:08 	    0x0010:  b3f5
+traffic-acc  16:52:08 00:52:08.234487 IP 23.212.185.5.5001 > 232.1.1.1.5001: UDP, length 125
+amt          16:52:08 00:52:07.653021 IP 10.9.1.3.48748 > 18.144.42.229.2268: UDP, length 8
+amt          16:52:08 00:52:07.676623 IP 18.144.42.229.2268 > 10.9.1.3.48748: UDP, length 44
+amt          16:52:08 00:52:07.677193 IP 10.9.1.3.48748 > 18.144.42.229.2268: UDP, length 52
+amt          16:52:08 00:52:08.231724 IP 18.144.42.229.2268 > 10.9.1.3.48748: UDP, length 155
+traffic-in   16:52:09 00:52:09.237356 IP 23.212.185.5.5001 > 232.1.1.1.5001: UDP, length 125
+traffic-acc  16:52:09 00:52:09.239396 IP 23.212.185.5.5001 > 232.1.1.1.5001: UDP, length 125
+amt          16:52:09 00:52:09.236599 IP 18.144.42.229.2268 > 10.9.1.3.48748: UDP, length 155
+traffic-in   16:52:10 00:52:10.225983 IP 23.212.185.5.5001 > 232.1.1.1.5001: UDP, length 125
+traffic-acc  16:52:10 00:52:10.227962 IP 23.212.185.5.5001 > 232.1.1.1.5001: UDP, length 125
+amt          16:52:10 00:52:10.225223 IP 18.144.42.229.2268 > 10.9.1.3.48748: UDP, length 155
+traffic-in   16:52:11 00:52:11.221415 IP 23.212.185.5.5001 > 232.1.1.1.5001: UDP, length 125
+traffic-acc  16:52:11 00:52:11.223737 IP 23.212.185.5.5001 > 232.1.1.1.5001: UDP, length 125
+amt          16:52:11 00:52:11.205063 IP 10.9.1.3.48748 > 18.144.42.229.2268: UDP, length 8
+amt          16:52:11 00:52:11.220561 IP 18.144.42.229.2268 > 10.9.1.3.48748: UDP, length 155
+amt          16:52:11 00:52:11.232374 IP 18.144.42.229.2268 > 10.9.1.3.48748: UDP, length 44
+amt          16:52:11 00:52:11.232970 IP 10.9.1.3.48748 > 18.144.42.229.2268: UDP, length 80
+traffic-in   16:52:12 00:52:12.221608 IP 23.212.185.5.5001 > 232.1.1.1.5001: UDP, length 125
+traffic-acc  16:52:12 00:52:12.223439 IP 23.212.185.5.5001 > 232.1.1.1.5001: UDP, length 125
+amt          16:52:12 00:52:12.220750 IP 18.144.42.229.2268 > 10.9.1.3.48748: UDP, length 155
+traffic-in   16:52:13 00:52:13.225834 IP 23.212.185.5.5001 > 232.1.1.1.5001: UDP, length 125
+traffic-acc  16:52:13 00:52:13.227841 IP 23.212.185.5.5001 > 232.1.1.1.5001: UDP, length 125
+amt          16:52:13 00:52:12.628904 IP 10.9.1.3.48748 > 18.144.42.229.2268: UDP, length 8
+amt          16:52:13 00:52:12.653116 IP 18.144.42.229.2268 > 10.9.1.3.48748: UDP, length 44
+amt          16:52:13 00:52:12.653680 IP 10.9.1.3.48748 > 18.144.42.229.2268: UDP, length 52
+amt          16:52:13 00:52:13.225087 IP 18.144.42.229.2268 > 10.9.1.3.48748: UDP, length 155
+amt          16:52:13 00:52:13.252963 IP 10.9.1.3.48748 > 18.144.42.229.2268: UDP, length 8
+amt          16:52:13 00:52:13.279630 IP 18.144.42.229.2268 > 10.9.1.3.48748: UDP, length 44
+amt          16:52:13 00:52:13.280227 IP 10.9.1.3.48748 > 18.144.42.229.2268: UDP, length 52
+traffic-in   16:52:14 00:52:14.228498 IP 23.212.185.5.5001 > 232.1.1.1.5001: UDP, length 125
+traffic-acc  16:52:14 00:52:14.230699 IP 23.212.185.5.5001 > 232.1.1.1.5001: UDP, length 125
+amt          16:52:14 00:52:14.227647 IP 18.144.42.229.2268 > 10.9.1.3.48748: UDP, length 155
+traffic-in   16:52:15 00:52:15.225346 IP 23.212.185.5.5001 > 232.1.1.1.5001: UDP, length 125
+traffic-in   16:52:15 10 packets captured
+traffic-in   16:52:15 11 packets received by filter
+traffic-in   16:52:15 0 packets dropped by kernel
+traffic-acc  16:52:15 00:52:15.227353 IP 23.212.185.5.5001 > 232.1.1.1.5001: UDP, length 125
+traffic-acc  16:52:15 10 packets captured
+traffic-acc  16:52:15 11 packets received by filter
+traffic-acc  16:52:15 0 packets dropped by kernel
+amt          16:52:15 00:52:15.224607 IP 18.144.42.229.2268 > 10.9.1.3.48748: UDP, length 155
+driad        16:52:16 01-28 00:52:16: joined to 23.212.185.5->232.1.1.1 for 11s
+amt          16:52:16 00:52:15.748909 IP 10.9.1.3.48748 > 18.144.42.229.2268: UDP, length 8
+amt          16:52:16 40 packets captured
+amt          16:52:16 43 packets received by filter
+amt          16:52:16 0 packets dropped by kernel
+watcher      16:52:19 00:52:19.533 Received PIM JOIN/PRUNE from 10.9.1.1 on eth0
+watcher      16:52:19 00:52:19.533 Received PIM JOIN from 10.9.1.1 to group 232.1.1.1 for source 23.212.185.5 on eth0
+watcher      16:52:19 00:52:19.533 k_req_incoming: ask path to 23.212.185.5
+watcher      16:52:19 00:52:19.533 netlink: vif 1, ifindex=9
+watcher      16:52:19 00:52:19.534 Added kernel MFC entry src 23.212.185.5 grp 232.1.1.1 from eth1 to eth0, pimreg
+ing-pim      16:52:19 00:52:19.532990 IP (tos 0xc0, ttl 1, id 10016, offset 0, flags [none], proto PIM (103), length 54)
+ing-pim      16:52:19     10.9.1.1 > 224.0.0.13: PIMv2, length 34
+ing-pim      16:52:19 	Join / Prune, cksum 0x1003 (correct), upstream-neighbor: 10.9.1.3
+ing-pim      16:52:19 	  1 group(s), holdtime: 3m30s
+ing-pim      16:52:19 	    group #1: 232.1.1.1, joined sources: 1, pruned sources: 0
+ing-pim      16:52:19 	      joined source #1: 23.212.185.5(S)
+watcher      16:52:21 00:52:21.225 netlink: vif 1, ifindex=9
+watcher      16:52:21 00:52:21.225 For src 169.254.0.1, iif is 1, next hop router is 169.254.0.1: NOT A PIM ROUTER
+watcher      16:52:21 00:52:21.225 k_req_incoming: ask path to 23.212.185.5
+watcher      16:52:21 00:52:21.226 netlink: vif 1, ifindex=9
+watcher      16:52:21 00:52:21.226 delete_mrtentry_all_kernel_cache: SG
+watcher      16:52:21 00:52:21.226 Removed MFC entry src 23.212.185.5, grp 232.1.1.1
+watcher      16:52:22 00:52:22.225 k_req_incoming: ask path to 23.212.185.5
+watcher      16:52:22 00:52:22.225 netlink: vif 1, ifindex=9
+watcher      16:52:22 00:52:22.226 move_kernel_cache: SG
+watcher      16:52:22 00:52:22.226 Added kernel MFC entry src 23.212.185.5 grp 232.1.1.1 from eth1 to eth0, pimreg
+watcher      16:52:24 00:52:24.645 delete_mrtentry_all_kernel_cache: SG
+watcher      16:52:24 00:52:24.645 Removed MFC entry src 23.212.185.5, grp 232.1.1.1
+watcher      16:52:25 00:52:25.228 k_req_incoming: ask path to 23.212.185.5
+watcher      16:52:25 00:52:25.228 netlink: vif 1, ifindex=9
+watcher      16:52:25 00:52:25.228 move_kernel_cache: SG
+watcher      16:52:25 00:52:25.229 Added kernel MFC entry src 23.212.185.5 grp 232.1.1.1 from eth1 to eth0, pimreg
+acc-igmp     16:52:26 00:52:26.536856 IP (tos 0xc0, ttl 1, id 0, offset 0, flags [DF], proto IGMP (2), length 44, options (RA))
+acc-igmp     16:52:26     10.7.1.56 > 224.0.0.22: igmp v3 report, 1 group record(s) [gaddr 232.1.1.1 block { 23.212.185.5 }]
+acc-igmp     16:52:26 00:52:26.537348 IP (tos 0xc0, ttl 1, id 33361, offset 0, flags [DF], proto IGMP (2), length 40, options (RA))
+acc-igmp     16:52:26     10.7.1.1 > 232.1.1.1: igmp query v3 [max resp time 1.0s] [gaddr 232.1.1.1 { 23.212.185.5 }]
+acc-igmp     16:52:26 00:52:26.944753 IP (tos 0xc0, ttl 1, id 0, offset 0, flags [DF], proto IGMP (2), length 44, options (RA))
+acc-igmp     16:52:26     10.7.1.56 > 224.0.0.22: igmp v3 report, 1 group record(s) [gaddr 232.1.1.1 block { 23.212.185.5 }]
+acc-igmp     16:52:26 00:52:26.945189 IP (tos 0xc0, ttl 1, id 33463, offset 0, flags [DF], proto IGMP (2), length 40, options (RA))
+acc-igmp     16:52:26     10.7.1.1 > 232.1.1.1: igmp query v3 [max resp time 1.0s] [gaddr 232.1.1.1 { 23.212.185.5 }]
+driad        16:52:27 01-28 00:52:27: joined to 23.212.185.5->232.1.1.1 for 22s
+watcher      16:52:28 00:52:28.540 Received PIM JOIN/PRUNE from 10.9.1.1 on eth0
+watcher      16:52:28 00:52:28.541 Received PIM PRUNE from 10.9.1.1 to group 232.1.1.1 for source 23.212.185.5 on eth0
+watcher      16:52:28 00:52:28.541 find_route: exact (S,G) entry for (23.212.185.5,232.1.1.1) found
+ing-pim      16:52:28 00:52:28.540442 IP (tos 0xc0, ttl 1, id 10017, offset 0, flags [none], proto PIM (103), length 54)
+ing-pim      16:52:28     10.9.1.1 > 224.0.0.13: PIMv2, length 34
+ing-pim      16:52:28 	Join / Prune, cksum 0x1003 (correct), upstream-neighbor: 10.9.1.3
+ing-pim      16:52:28 	  1 group(s), holdtime: 3m30s
+ing-pim      16:52:28 	    group #1: 232.1.1.1, joined sources: 0, pruned sources: 1
+ing-pim      16:52:28 	      pruned source #1: 23.212.185.5(S)
+acc-pim      16:52:28 00:52:28.538314 IP (tos 0xc0, ttl 1, id 3142, offset 0, flags [none], proto PIM (103), length 54)
+acc-pim      16:52:28     10.8.1.2 > 224.0.0.13: PIMv2, length 34
+acc-pim      16:52:28 	Join / Prune, cksum 0x1006 (correct), upstream-neighbor: 10.8.1.1
+acc-pim      16:52:28 	  1 group(s), holdtime: 3m30s
+acc-pim      16:52:28 	    group #1: 232.1.1.1, joined sources: 0, pruned sources: 1
+acc-pim      16:52:28 	      pruned source #1: 23.212.185.5(S)
+watcher      16:52:31 00:52:31.224 Sending PIM HELLO on eth0
+watcher      16:52:31 00:52:31.224 Sending PIM HELLO on eth1
+watcher      16:52:31 00:52:31.572 PIM HELLO holdtime from 10.9.1.1 is 105
+watcher      16:52:31 00:52:31.572 PIM DR PRIORITY from 10.9.1.1 is 1
+watcher      16:52:31 00:52:31.572 PIM GenID from 10.9.1.1 is 1539487375
+watcher      16:52:31 00:52:31.574 PIM HELLO holdtime from 172.19.0.2 is 105
+watcher      16:52:31 00:52:31.574 PIM DR PRIORITY from 172.19.0.2 is 1
+watcher      16:52:31 00:52:31.575 PIM GenID from 172.19.0.2 is 2039750873
+watcher      16:52:31 2021-01-28 00:52:31,685[DEBUG]: ignoring: 0x0000:  0000 0001
+watcher      16:52:31 2021-01-28 00:52:31,686[DEBUG]: ignoring: Generation ID Option (20), length 4, Value: 0x5bc2b68f
+watcher      16:52:31 2021-01-28 00:52:31,687[DEBUG]: ignoring: 0x0000:  5bc2 b68f
+watcher      16:52:31 2021-01-28 00:52:31,688[DEBUG]: ignoring: Address List Option (24), length 18, Value:
+watcher      16:52:31 2021-01-28 00:52:31,689[DEBUG]: ignoring: fe80::2e0:4cff:fe68:5ff
+watcher      16:52:31 2021-01-28 00:52:31,690[DEBUG]: ignoring: 0x0000:  0200 fe80 0000 0000 0000 02e0 4cff fe68
+watcher      16:52:31 2021-01-28 00:52:31,692[DEBUG]: ignoring: 0x0010:  05ff
+watcher      16:52:31 2021-01-28 00:52:31,693[DEBUG]: ignoring: 00:52:19.532990 IP (tos 0xc0, ttl 1, id 10016, offset 0, flags [none], proto PIM (103), length 54)
+watcher      16:52:31 2021-01-28 00:52:31,694[DEBUG]: ignoring: 10.9.1.1 > 224.0.0.13: PIMv2, length 34
+watcher      16:52:31 2021-01-28 00:52:31,696[DEBUG]: cleanly finished join/prune packet
+watcher      16:52:31 2021-01-28 00:52:31,697[DEBUG]: saw sg notice: "Joins[23.212.185.5->232.1.1.1]; Prunes[]"
+watcher      16:52:31 2021-01-28 00:52:31,697[INFO]: live sg refreshed: 23.212.185.5->232.1.1.1
+watcher      16:52:31 2021-01-28 00:52:31,698[DEBUG]: ignoring: 00:52:28.540442 IP (tos 0xc0, ttl 1, id 10017, offset 0, flags [none], proto PIM (103), length 54)
+watcher      16:52:31 2021-01-28 00:52:31,698[DEBUG]: ignoring: 10.9.1.1 > 224.0.0.13: PIMv2, length 34
+watcher      16:52:31 2021-01-28 00:52:31,699[DEBUG]: cleanly finished join/prune packet
+watcher      16:52:31 2021-01-28 00:52:31,699[DEBUG]: saw sg notice: "Joins[]; Prunes[23.212.185.5->232.1.1.1]"
+watcher      16:52:31 2021-01-28 00:52:31,700[INFO]: removing live sg: 23.212.185.5->232.1.1.1
+watcher      16:52:31 2021-01-28 00:52:31,700[INFO]: stopping sg 23.212.185.5->232.1.1.1
+cbacc        16:52:31 2021-01-28 00:52:31,703[INFO]: got sgs update: set()
+cbacc        16:52:31 2021-01-28 00:52:31,703[INFO]: none blocked (0 flows with 0mb) active and (0) held down from prior block: set()
+cbacc        16:52:31 2021-01-28 00:52:31,705[INFO]: got sgs update: set()
+cbacc        16:52:31 2021-01-28 00:52:31,705[INFO]: none blocked (0 flows with 0mb) active and (0) held down from prior block: set()
+driad        16:52:31 2021-01-28 00:52:31,707[INFO]: removing live sg: 23.212.185.5->232.1.1.1
+driad        16:52:31 2021-01-28 00:52:31,707[INFO]: stopping sg 23.212.185.5->232.1.1.1
+driad        16:52:31 2021-01-28 00:52:31,708[INFO]: removing 23.212.185.5->232.1.1.1 from gw gw(18.144.42.229):1
+driad        16:52:31 2021-01-28 00:52:31,708[INFO]: source 23.212.185.5 removed from relay_ips (18.144.42.229)
+driad        16:52:31 2021-01-28 00:52:31,709[INFO]: shutting down gw gw(18.144.42.229):0 with no more sgs
+driad        16:52:31 2021-01-28 00:52:31,709[INFO]: stopping gw gw(18.144.42.229):0
+ing-pim      16:52:31 00:52:31.224651 IP (tos 0x0, ttl 1, id 39617, offset 0, flags [none], proto PIM (103), length 46)
+ing-pim      16:52:31     10.9.1.3 > 224.0.0.13: PIMv2, length 26
+ing-pim      16:52:31 	Hello, cksum 0x39ef (correct)
+ing-pim      16:52:31 	  Hold Time Option (1), length 2, Value: 1m45s
+ing-pim      16:52:31 	    0x0000:  0069
+ing-pim      16:52:31 	  DR Priority Option (19), length 4, Value: 1
+ing-pim      16:52:31 	    0x0000:  0000 0001
+ing-pim      16:52:31 	  Generation ID Option (20), length 4, Value: 0x6b0f3a65
+ing-pim      16:52:31 	    0x0000:  6b0f 3a65
+ing-pim      16:52:31 00:52:31.571994 IP (tos 0xc0, ttl 1, id 10018, offset 0, flags [none], proto PIM (103), length 76)
+ing-pim      16:52:31     10.9.1.1 > 224.0.0.13: PIMv2, length 56
+ing-pim      16:52:31 	Hello, cksum 0x6c61 (correct)
+ing-pim      16:52:31 	  Hold Time Option (1), length 2, Value: 1m45s
+ing-pim      16:52:31 	    0x0000:  0069
+ing-pim      16:52:31 	  LAN Prune Delay Option (2), length 4, Value: 
+ing-pim      16:52:31 	    T-bit=0, LAN delay 500ms, Override interval 2500ms
+ing-pim      16:52:31 	    0x0000:  01f4 09c4
+ing-pim      16:52:31 	  DR Priority Option (19), length 4, Value: 1
+ing-pim      16:52:31 	    0x0000:  0000 0001
+ing-pim      16:52:31 	  Generation ID Option (20), length 4, Value: 0x5bc2b68f
+ing-pim      16:52:31 	    0x0000:  5bc2 b68f
+ing-pim      16:52:31 	  Address List Option (24), length 18, Value: 
+ing-pim      16:52:31 	    fe80::2e0:4cff:fe68:5ff
+ing-pim      16:52:31 	    0x0000:  0200 fe80 0000 0000 0000 02e0 4cff fe68
+ing-pim      16:52:31 	    0x0010:  05ff
+acc-pim      16:52:32 00:52:31.572960 IP (tos 0xc0, ttl 1, id 10019, offset 0, flags [none], proto PIM (103), length 76)
+acc-pim      16:52:32     10.8.1.1 > 224.0.0.13: PIMv2, length 56
+acc-pim      16:52:32 	Hello, cksum 0x0ae4 (correct)
+acc-pim      16:52:32 	  Hold Time Option (1), length 2, Value: 1m45s
+acc-pim      16:52:32 	    0x0000:  0069
+acc-pim      16:52:32 	  LAN Prune Delay Option (2), length 4, Value: 
+acc-pim      16:52:32 	    T-bit=0, LAN delay 500ms, Override interval 2500ms
+acc-pim      16:52:32 	    0x0000:  01f4 09c4
+acc-pim      16:52:32 	  DR Priority Option (19), length 4, Value: 1
+acc-pim      16:52:32 	    0x0000:  0000 0001
+acc-pim      16:52:32 	  Generation ID Option (20), length 4, Value: 0x64450eb8
+acc-pim      16:52:32 	    0x0000:  6445 0eb8
+acc-pim      16:52:32 	  Address List Option (24), length 18, Value: 
+acc-pim      16:52:32 	    fe80::2e0:4cff:fe68:6d1
+acc-pim      16:52:32 	    0x0000:  0200 fe80 0000 0000 0000 02e0 4cff fe68
+acc-pim      16:52:32 	    0x0010:  06d1
+watcher      16:52:36 00:52:36.050 find_route: exact (S,G) entry for (23.212.185.5,232.1.1.1) found
+acc-pim      16:52:38 00:52:37.755386 IP (tos 0xc0, ttl 1, id 3143, offset 0, flags [none], proto PIM (103), length 76)
+acc-pim      16:52:38     10.8.1.2 > 224.0.0.13: PIMv2, length 56
+acc-pim      16:52:38 	Hello, cksum 0xf3de (correct)
+acc-pim      16:52:38 	  Hold Time Option (1), length 2, Value: 1m45s
+acc-pim      16:52:38 	    0x0000:  0069
+acc-pim      16:52:38 	  LAN Prune Delay Option (2), length 4, Value: 
+acc-pim      16:52:38 	    T-bit=0, LAN delay 500ms, Override interval 2500ms
+acc-pim      16:52:38 	    0x0000:  01f4 09c4
+acc-pim      16:52:38 	  DR Priority Option (19), length 4, Value: 1
+acc-pim      16:52:38 	    0x0000:  0000 0001
+acc-pim      16:52:38 	  Generation ID Option (20), length 4, Value: 0x622ded32
+acc-pim      16:52:38 	    0x0000:  622d ed32
+acc-pim      16:52:38 	  Address List Option (24), length 18, Value: 
+acc-pim      16:52:38 	    fe80::5e85:7eff:fe40:b3f5
+acc-pim      16:52:38 	    0x0000:  0200 fe80 0000 0000 0000 5e85 7eff fe40
+acc-pim      16:52:38 	    0x0010:  b3f5
+watcher      16:52:41 00:52:41.240 netlink: vif 1, ifindex=9
+watcher      16:52:41 00:52:41.240 For src 169.254.0.1, iif is 1, next hop router is 169.254.0.1: NOT A PIM ROUTER
+watcher      16:52:41 00:52:41.240 k_req_incoming: ask path to 23.212.185.5
+watcher      16:52:41 00:52:41.240 netlink: vif 1, ifindex=9
+driad        16:52:42 ingest-gw-18.144.42.229
+driad        16:52:42 2021-01-28 00:52:42,685[INFO]: stopped container: CompletedProcess(args=['/usr/bin/docker', 'container', 'stop', 'ingest-gw-18.144.42.229'], returncode=0)

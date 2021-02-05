@@ -9,6 +9,8 @@ RUN git clone --depth=1 https://github.com/troglobit/pimd.git /root/pimd
 WORKDIR /root/pimd
 RUN ./autogen.sh
 RUN ./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var
+COPY pimwatch/docker/pimd-hack.patch /tmp/
+RUN patch -p1 -i /tmp/pimd-hack.patch
 RUN make
 RUN make install-strip DESTDIR=/tmp
 

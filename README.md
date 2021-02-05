@@ -140,7 +140,6 @@ These settings can be pasted verbatim if using the [sample-network](sample-netwo
 
 ~~~
 IFACE=irf0
-GATEWAY=10.9.1.1
 SUBNET=10.9.1.0/24
 PIMD=10.9.1.2
 # these may be helpful for extracting the IP of $IFACE in a script:
@@ -153,14 +152,13 @@ BW_MAX_MIBPS=50
 JOINFILE=${HOME}/pimwatch/pimwatch.sgs
 CBJOINFILE=${HOME}/cbacc/cbacc.sgs
 
-INGEST_VERSION=0.0.4
+INGEST_VERSION=0.0.5
 ~~~
 
 Variable meanings:
 
   - **IFACE**:  the physical interface on the host that you'll be plugging into your multicast network.  (I named mine irf for "ingest reflector", but it should match the name of the physical interface on your host machine.)
-  - **GATEWAY**: the IP address of the gateway for the ingest device's connection within your multicast network.  This should be the next hop toward a default route out that interface.
-  - **SUBNET**: the subnet for PIMD and GATEWAY
+  - **SUBNET**: the subnet for PIMD
   - **PIMD**: the IP address the PIM adjacency will use for connecting over IFACE, from inside the container.  If you are using IFACE for other traffic, this IP has to be different from the IP address for the host.  (There's a sample command below that tries to extract it from the output of "ip addr show dev $IFACE" and then add one.)
   - **BW_MAX_MIBPS**: The max bandwidth, to be enforced by `cbacc` according to the flow metadata.
   - **JOINFILE**: The full path of the joinfile produced by `pimwatch` (consumed by `cbacc` or `driad-ingest` if running without cbacc)
@@ -195,7 +193,7 @@ sudo docker run \
     --network mcast-native-ingest \
     --log-opt max-size=2m --log-opt max-file=5 \
     -d --restart=unless-stopped \
-    grumpyoldtroll/pim-dummy-upstream:${INGEST_VERSION}
+    grumpyoldtroll/pim-dummy-upstream:0.0.4
 
 # ensure the joinfile is present
 mkdir -p $(dirname ${JOINFILE}) && touch ${JOINFILE}
@@ -223,7 +221,7 @@ If you want to permit ingesting traffic without cbacc metadata, you can provide 
 
 If you don't want to run cbacc at all, you don't have to.  Set `CBJOINFILE=$JOINFILE` before starting driad-ingest and don't launch cbacc, and driad-ingest will use the joinfile produced by pimwatch, rather than the filtered joinfile produced by cbacc.
 
-NB: the default behavior of cbacc when no CBACC metadata is present for an (S,G) is to set its bitrate above the maximum bitrate, so it will always be blocked.  If you want to ingest traffic from sources that do not have CBACC metadata, it will be necessary either to run without `cbacc` or to set a `--default <bandwidth>` override bandwidth for unknown (S,G)s.
+NB: the default behavior of cbacc when no CBACC metadata is present for an (S,G) is to set its bitrate above the maximum bitrate, so it will always be blocked.  If you want to avoid ingesting traffic from sources that do not have CBACC metadata, remove the `--default <bandwidth>` override of the "effective MiBps" estimate for unknown (S,G)s, which will cause cbacc to avoid allowing them.  (And if the external flows without cbacc will exceed 12mbps, adjust the parameter accordingly.)
 
 ~~~
 # ensure both joinfiles are present
@@ -242,7 +240,8 @@ sudo docker run \
       -v \
       --input-file /var/run/cbacc-in/$(basename ${JOINFILE}) \
       --output-file /var/run/cbacc-out/$(basename ${CBJOINFILE}) \
-      --bandwidth ${BW_MAX_MIBPS}
+      --bandwidth ${BW_MAX_MIBPS} \
+      --default 12
 ~~~
 
 ### driad-ingest
@@ -281,107 +280,273 @@ Some things also need to be mounted in the container:
  * **/var/run/ingest/**\
   The directory containing the joinfile that's passed in has to be mounted as a directory.  This is because internally, the file is watched with [inotify](https://man7.org/linux/man-pages/man7/inotify.7.html), which wants to monitor the directory for changes.
 
-### NATting AMT Traffic
-
-Assuming you have a default route on your host and that's the way
-you want your AMT traffic to flow, you don't need to do this section.
-
-However, if you have a default route that's a management IP, and you
-want the AMT traffic to route out through the multicast network, you
-can configure the routing for traffic from the amt-bridge to point
-your traffic into the multicast-capable network instead.
-
-Doing this requires that the multicast network can route traffic to
-the internet with unicast from the host's IP (PIMD) on that link.
-
-You can do this with source routing through a separate table:
-
-~~~bash
-# put the subnet of amt-bridge in AMTSRCNET:
-AMTSRCNET=$(sudo docker network inspect amt-bridge | grep Subnet | sed -e 's/ *"Subnet": "\(.*\)",/\1/')
-
-# find the ifname of the amt-bridge gateway.  Without the route that
-# uses this, ARP fails unfortunately.  (On ubuntu 20+ you can use
-# "iproute udp dport 2268" on the rule for the source traffic instead
-# of the extra route in table 10, but on the ubuntu 18.04 I'm currently
-# using those features are unsupported)
-AMTGWIP=$(sudo docker network inspect amt-bridge | grep Gateway | sed -e 's/ *"Gateway": "\(.*\)",*/\1/')
-AMTGWIF=$(ip addr show | grep ${AMTGWIP} | awk '{print $7;}')
-
-# add a routing table for the data network:
-sudo ip route add table 10 to ${SUBNET} dev ${IFACE}
-sudo ip route add table 10 to ${AMTSRCNET} dev ${AMTGWIF}
-sudo ip route add table 10 to default via ${GATEWAY} dev ${IFACE}
-
-# send traffic from the AMT bridge into that routing table and nat it:
-sudo ip rule add from ${AMTSRCNET} table 10 priority 50
-~~~
-
-Some have said there's other alternative setups that are necessary in their environments.  TBD: collect a set of use cases, network diagrams, with helpful config examples.
-
 # Troubleshooting
 
-## Checking the basics
+There are several things to check.
+In this section we'll walk through the output of the [ingest-troubleshoot.sh](ingest-troubleshoot.sh) script run inside a [sample-network](sample-network), with a list of things to look for.
 
-You might want to make sure there's not some external kind of block happening.  For this, I generally try receiving a trickle stream I leave running for this purpose on 23.212.185.4->232.1.1.1.  You can run a receiver for it manually on your ingest platform to ensure the ingest platform's network can successfully discover and ingest the traffic at all:
+To generate the output, we used the `ingest-troubleshoot.sh` program in this repo, and left it active while subscribing to traffic.
 
-~~~
-SOURCEIP=23.212.185.4
-GROUPIP=232.1.1.1
-# after git clone https://github.com/GrumpyOldTroll/libmcrx to get libmcrx/driad.py
-DISCIP=$(python3 libmcrx/driad.py $SOURCEIP)
-sudo docker run -d --rm --name amtgw --privileged grumpyoldtroll/amtgw:latest $DISCIP
-sudo docker run -it --rm --name rx2 grumpyoldtroll/iperf-ssm:latest --server --udp --bind $GROUPIP --source $SOURCEIP --interval 1 --len 1500 --interface eth0
-~~~
+This program launches several ssh sessions running a few diagnostic commands within the network and merges their output into a single text file with timestamps and a tag indicating which session produced each line.
 
-If that starts giving you one line per second that looks something like this, it means the AMT connectivity is working and there's an active sender:
+For your network, it's likely that you'll need to edit the ingest-troubleshoot.sh file to use the login for your ingest device as the `INGEST` variable at the bottom if it's different from `user@10.9.1.3`, and likewise may want to change the `ACCESS` variable or remove the calls that use it.
+
+The `watch_container` function will monitor logs produced by the docker containers above, and the other `watch_xxx` functions are running a `tcpdump` that watches for a specific set of traffic.
+
+The output we'll be examining was generated by running 2 commands in separate shells.
 
 ~~~
-$ sudo docker run -it --rm --name rx2 grumpyoldtroll/iperf-ssm:latest --server --udp --bind $GROUPIP --source $SOURCEIP --interval 1 --len 1500 --interface eth0
-setting perf ip4 ttl to 1
-------------------------------------------------------------
-Server listening on UDP port 5001
-Binding to local address 232.1.1.1
-Joining multicast group  232.1.1.1
-Joining multicast group on interface  eth0
-Accepting multicast group source  23.212.185.4
-Receiving 1500 byte datagrams
-UDP buffer size:  208 KByte (default)
-------------------------------------------------------------
-setting perf ip4 ttl to 1
-[  3] local 232.1.1.1 port 5001 connected with 23.212.185.4 port 5001
-[ ID] Interval       Transfer     Bandwidth        Jitter   Lost/Total Datagrams
-[  3]  0.0- 1.0 sec   125 Bytes  1.00 Kbits/sec   0.000 ms   87/   88 (99%)
-[  3]  1.0- 2.0 sec  0.00 Bytes  0.00 bits/sec   0.000 ms    0/    0 (-nan%)
-[  3]  2.0- 3.0 sec   250 Bytes  2.00 Kbits/sec   0.397 ms    0/    2 (0%)
-^CWaiting for server threads to complete. Interrupt again to force quit.
-[  3]  3.0- 4.0 sec   125 Bytes  1.00 Kbits/sec   0.377 ms    0/    1 (0%)
+./ingest-troubleshoot.sh | stdbuf -oL -eL tee sample-troubleshoot.log
 ~~~
 
-The first line reporting a high loss is an artifact of the way iperf is running.  In this model, the sender (or "client", as iperf calls it, which is kind of weird but makes some twisted sense for UDP, since servers are the ones who listen) is running from my source all the time, and the receiver (or "server" as iperf calls it) starts listening at some arbitrary time, so it sees a bunch of "loss".  The sender is restarted every 15 minutes and sends a single 125-byte packet per second (1kbps), each of which counts toward the receiver's stats.
+To subscribe to traffic from a receiver inside the [sample-network](sample-network/README.md), we ran the `mcrx-check` program from [libmcrx](https://github.com/GrumpyOldTroll/libmcrx):
 
-If you don't see the lines below `[  3] local 232.1.1.1 port 5001 connected with 23.212.185.4 port 5001`, or they aren't updating approximately once per second, it can mean the sender is not up right now, or that something else basic that the ingest relies on isn't working yet.
-Usually (but not always) you can tell by looking at the AMT traffic on UDP port 2268.  If you see 2-way traffic between your host and $DISCIP, the tunnel is probably connected, and the problem is at the sender side (either not actively sending upstream of the relay, or the current DNS records have advertised the wrong AMT relay address for this source).  Otherwise (if there is only outbound traffic), the problem is probably something to do with connectivity to the AMT relay (sometimes the outbound traffic is blocked and needs a port opened, for some networks), or the AMT relay itself is down or at a different-than-advertised address.  If not even one-way AMT traffic is visible on the host's outbound interface, it probably means a firewall setting within this host is blocking oubound traffic.
-
-## Where to look
-
-I usually do the first few stages of troubleshooting with tcpdump, since it gives you a good idea of where the problem lies.
-
-TBD: add some sample pcaps with network diagram locations.
-
-## How to get in once you've found where it's broken
-
-Access to the containers underlying file system with sh:
-
-~~~bash
-sudo docker exec -it driad-ingest sh
+~~~
+$ libmcrx/mcrx-check -s 23.212.185.4 -g 232.1.1.1 -p 5001 -d 0 -c 20
+02-03 16:04:34: joined to 23.212.185.4->232.1.1.1:5001 for 2s, 0 pkts received
+02-03 16:04:36: joined to 23.212.185.4->232.1.1.1:5001 for 4s, 0 pkts received
+02-03 16:04:38: joined to 23.212.185.4->232.1.1.1:5001 for 6s, 0 pkts received
+02-03 16:04:40: joined to 23.212.185.4->232.1.1.1:5001 for 8s, 0 pkts received
+02-03 16:04:42: joined to 23.212.185.4->232.1.1.1:5001 for 10s, 2 pkts received
+02-03 16:04:44: joined to 23.212.185.4->232.1.1.1:5001 for 12s, 4 pkts received
+02-03 16:04:46: joined to 23.212.185.4->232.1.1.1:5001 for 14s, 6 pkts received
+02-03 16:04:48: joined to 23.212.185.4->232.1.1.1:5001 for 16s, 8 pkts received
+02-03 16:04:50: joined to 23.212.185.4->232.1.1.1:5001 for 18s, 10 pkts received
+02-03 16:04:52: joined to 23.212.185.4->232.1.1.1:5001 for 20s, 12 pkts received
+02-03 16:04:54: joined to 23.212.185.4->232.1.1.1:5001 for 22s, 14 pkts received
+02-03 16:04:56: joined to 23.212.185.4->232.1.1.1:5001 for 24s, 16 pkts received
+02-03 16:04:58: joined to 23.212.185.4->232.1.1.1:5001 for 26s, 18 pkts received
+passed (20/20 packets in 27s)
 ~~~
 
-It's also often helpful to see the log output, especially if you've passed the `-v` parameters at the end, as the above examples do.  There's logging that at least shows whether joins are reaching the router and what gateways are launched (also visible with "docker container ls"):
+That joined the (S,G) with SourceIP=23.212.185.4 and GroupIP=232.1.1.1, and listened on UDP port 5001.
+This stream is a 1kbps stream producing 1 packet per second, sourced externally.
 
-~~~bash
-sudo docker logs -f pimwatch
+## Diagnostics Examination
+
+The full diagnostic output file is in [sample-troubleshoot.log](sample-troubleshoot.log).
+In this section we'll point to specific lines that are good indicators to check.
+If there's an attempt at a connection that fails, it's very likely that one of these indicator lines is not present, and doing something unexpected.
+
+NB: There are 2 different timestamps at the beginning of many of the lines from tcpdump or the container logs because the first timestamp is from the receiver's clock, where ingest-troubleshoot.sh was launched, and the 2nd timestamp is from the machine where the diagnostic command was running, and in this case they have different time zones configured, and hence are off by 8 hours (PDT vs. GMT).  In some cases, timestamps may further diverge by up to a few seconds when there was a transmission delay in the ssh session.
+
+NB2: In many cases, events that occur at nearly the same time on different machines can easily appear out of order in the log.
+This occurs numerous times in this example (for instance, the IGMP message on line 41 must necessarily occur before the PIM message from the access router on line 37, which must necessarily occur before the PIM message from the ingest device on line 31).
+This walkthrough covers the events in the order they occur in the network, but when events on different devices are within a short time from one another, they often may appear out of order in the logs.
+This is expected behavior, in general.
+
+### IGMPv3 or MLDv2 SSM Join
+
+When a receiver joins an (S,G), the host OS where that receiver is running uses [IGMP](https://www.rfc-editor.org/rfc/rfc3376.html) or [MLD](https://www.rfc-editor.org/rfc/rfc3810.html) to communicate the host's group membership to the network.
+
+At [line 37](sample-troubleshoot.log#L37) of sample-troubleshoot.log we see:
+
 ~~~
+acc-igmp     16:04:32 00:04:32.026725 IP (tos 0xc0, ttl 1, id 0, offset 0, flags [DF], proto IGMP (2), length 44, options (RA))
+acc-igmp     16:04:32     10.7.1.56 > 224.0.0.22: igmp v3 report, 1 group record(s) [gaddr 232.1.1.1 allow { 23.212.185.4 }]
+~~~
+
+These lines come from a tcpdump watching the connection between the receiver device and its first-hop router (under the `watch_igmp` function in [ingest-troubleshoot.sh](ingest-troubleshoot.sh#L97):
+
+~~~
+tcpdump -i $IFACE -n -vvv igmp
+~~~
+
+The key features in these lines are:
+
+ - **acc-igmp**: indicates the line was generated by the `watch_igmp` command passing the `acc-igmp` tag as the first argument, at the bottom of [ingest-troubleshoot.sh](ingest-troubleshoot.sh).
+ - **igmp v3 report**: indicates the packet is an IGMPv3 membership report
+ - **gaddr 232.1.1.1 allow { 23.212.185.4 }**: indicates the packet is asking the network to subscribe to the (S,G) with source 23.212.185.4 and group 232.1.1.1.
+
+In some misconfigured or constrained networks, starting a receiver that joins might see an IGMPv2 report without a source address instead of an IGMPv3 report.
+The normal ingest platform requires the use of SSM, but networks that need a workaround at this stage can consider using [MNAT](https://github.com/GrumpyOldTroll/mnat).
+
+### PIM SSM Joins
+
+The sample-troubleshoot.log file examined in the rest of this walkthrough excluded the watch_pim calls to make a smaller log file that didn't have as much junk in it, but an extra earlier run for 23.212.185.5 (instead of .4) to 232.1.1.1 is also included in [sample-troubleshoot-with-pim.log](sample-troubleshoot-with-pim.log) with some extra debugging enabled, to provide samples for this section.
+
+When the join gets advertised to the network successfully with IGMP/MLD, the [sample-network](sample-network) propagates the request as a [PIM](https://www.rfc-editor.org/rfc/rfc7761.html) Join message along the reverse path toward the route to the source address.
+The network needs to be configured so that that reverse path lands at the ingest device (e.g. by the use of a command like [ip mroute](https://www.cisco.com/c/m/en_us/techdoc/dc/reference/cli/nxos/commands/pim/ip-mroute.html) to configure the next-hop router's MRIB to use the ingest device as the default route for multicast RPF lookups).
+
+At [line 37](sample-troubleshoot-with-pim.log#L37) of sample-troubleshoot-with-pim.log, we see the PIM join packet propagating uptream from the access-rtr (the nearest router to the receiver):
+
+~~~
+acc-pim      16:51:40 	Join / Prune, cksum 0x1006 (correct), upstream-neighbor: 10.8.1.1
+acc-pim      16:51:40 	  1 group(s), holdtime: 3m30s
+acc-pim      16:51:40 	    group #1: 232.1.1.1, joined sources: 1, pruned sources: 0
+acc-pim      16:51:40 	      joined source #1: 23.212.185.5(S)
+~~~
+
+At [line 31](sample-troubleshoot-with-pim.log#L31) of sample-troubleshoot-with-pim.log, we see a nearly identical PIM join packet propagating into the ingest platform:
+
+~~~
+ing-pim      16:51:40 	Join / Prune, cksum 0x1003 (correct), upstream-neighbor: 10.9.1.3
+ing-pim      16:51:40 	  1 group(s), holdtime: 3m30s
+ing-pim      16:51:40 	    group #1: 232.1.1.1, joined sources: 1, pruned sources: 0
+ing-pim      16:51:40 	      joined source #1: 23.212.185.5(S)
+~~~
+
+These diagnostic lines were both generated with the following command, from inside the `watch_pim` function in [ingest-troubleshoot.sh](ingest-troubleshoot.sh#L98):
+
+~~~
+tcpdump -i $IFACE -n -vvv pim
+~~~
+
+If a packet like this arrives at the ingest device, it means the network has successfully informed the ingest device about the (S,G) joined by a receiver.
+It also generally means the forwarding is properly set up through the network.
+
+### Container Reactions
+
+Once a PIM Join has reached the ingest device, there are several new opportunities for things to go wrong, and what to fix depends on which one it was.
+
+The expected chain of events looks like:
+
+ 1. `pimwatch` sees the join and merges it into the joinfile it outputs
+ 2. `cbacc` sees the edit to the joinfile from `pimwatch`, checks for exceeding the bandwidth limits, and updates the joinfile it outputs
+ 3. `driad-ingest` sees the edit to the joinfile from `cbacc`, finds the right relay, launches `amtgw` connecting to it, and communicate the group membership to the relay over the AMT tunnel.
+
+All the lines that appear in the [log](sample-troubleshoot.log) with the `watcher`, `cbacc`, and `driad` tags as the first word of the line were generated by calling `docker logs --since 1s -f $CONTAINER` from inside the [watch_container](ingest-troubleshoot.sh#L56) function on the ingest device.
+
+#### pimwatch
+
+The relevant pimwatch log lines at [line 32](sample-troubleshoot.log#L32) looks like this:
+
+~~~
+watcher      16:04:32 00:04:32.038 Received PIM JOIN/PRUNE from 10.9.1.1 on eth0
+watcher      16:04:32 00:04:32.038 Received PIM JOIN from 10.9.1.1 to group 232.1.1.1 for source 23.212.185.4 on eth0
+watcher      16:04:32 00:04:32.038 move_kernel_cache: SG
+watcher      16:04:32 00:04:32.038 move_kernel_cache: SG
+watcher      16:04:32 00:04:32.039 Added kernel MFC entry src 23.212.185.4 grp 232.1.1.1 from eth1 to eth0
+~~~
+
+This is output from [pimd](https://github.com/troglobit/pimd/blob/4507d7c76fc6665eede7704b82b0598b29845159/src/kern.c#L491) indicating that the forwarding path was set up in the kernel for this (S,G).
+
+It's marked by the **watcher** tag as given as the first argument to the `watch_container` function call in [ingest-troubleshoot.sh](ingest-troubleshoot.sh#L94).
+
+These lines report that it has seen the join for 23.212.185.4->232.1.1.1 and is including it in its output joinfile.
+
+The other important pieces come from [pimwatch](pimwatch/pimwatch.py), where the joinfile is managed so that cbacc (or driad-ingest, if not running cbacc) can consume it.
+
+The relevant pimwatch log lines at [line 42](sample-troubleshoot.log#L42) look like this:
+
+~~~
+watcher      16:04:35 2021-02-04 00:04:35,186[INFO]: adding new sg: 23.212.185.4->232.1.1.1
+watcher      16:04:35 2021-02-04 00:04:35,189[INFO]: launching join for (IPv4Address('23.212.185.4'), IPv4Address('232.1.1.1'))
+watcher      16:04:35 2021-02-04 00:04:35,196[INFO]: live sg refreshed: 23.212.185.4->232.1.1.1
+~~~
+
+Near the end at [line 152](sample-troubleshoot.log#L152) the container does the inverse operation, removing the (S,G) from its output joinfile in response to a prune message (causing a similar reversal in the cbacc and driad-ingest containers):
+
+~~~
+watcher      16:05:01 00:05:01.542 Received PIM JOIN/PRUNE from 10.9.1.1 on eth0
+watcher      16:05:01 00:05:01.542 Received PIM PRUNE from 10.9.1.1 to group 232.1.1.1 for source 23.212.185.4 on eth0
+watcher      16:05:01 00:05:01.542 find_route: exact (S,G) entry for (23.212.185.4,232.1.1.1) found
+watcher      16:05:05 2021-02-04 00:05:05,904[INFO]: removing live sg: 23.212.185.4->232.1.1.1
+watcher      16:05:05 2021-02-04 00:05:05,906[INFO]: stopping sg 23.212.185.4->232.1.1.1
+~~~
+
+This container runs [pimwatch-start](pimwatch/docker/pimwatch-start.py) to launch both [pimd](https://github.com/troglobit/pimd) and [pimwatch](pimwatch/pimwatch.py), so generally the log lines come from one of those processes.
+
+#### cbacc
+
+The relevant cbacc log lines at [line 47](sample-troubleshoot.log#L47) look like this:
+
+~~~
+cbacc        16:04:35 2021-02-04 00:04:35,197[INFO]: got sgs update: {(IPv4Address('23.212.185.4'), IPv4Address('232.1.1.1'))}
+cbacc        16:04:35 2021-02-04 00:04:35,738[INFO]: fetching cbacc info with https://disrupt-dorms.edgesuite.net/restconf/data/ietf-dorms:metadata/sender=23.212.185.4/group=232.1.1.1/ietf-cbacc:cbacc
+cbacc        16:04:35 2021-02-04 00:04:35,782[INFO]: none blocked (1 flows with 0.00191mb) active and (0) held down from prior block: set()
+~~~
+
+When joining an (S,G) would put the cbacc joinfile over the total bandwidth limit, some (S,G)s will be blocked according to the [fairness function](https://datatracker.ietf.org/doc/html/draft-ietf-mboned-cbacc-02#section-2.3.2) implemented in [cbacc-mgr](cbacc/cbacc-mgr.py#L283).
+
+Lines emitted by this container are marked by the **cbacc** tag as given as the first argument to the `watch_container` function call in [ingest-troubleshoot.sh](ingest-troubleshoot.sh#L95).
+
+#### driad-ingest
+
+The relevant driad-ingest log lines at [line 50](sample-troubleshoot.log#L50) look like this:
+
+~~~
+driad        16:04:35 2021-02-04 00:04:35,787[INFO]: adding new sg: 23.212.185.4->232.1.1.1
+driad        16:04:35 2021-02-04 00:04:35,788[INFO]: finding relay ip for 23.212.185.4
+driad        16:04:35 2021-02-04 00:04:35,908[INFO]: found relay option prec=16,d=0,typ=3,val=r4v4.amt.akadns.net.
+driad        16:04:35 2021-02-04 00:04:35,909[INFO]: randomly chose idx 0 of 1 relay options
+driad        16:04:36 2021-02-04 00:04:36,038[INFO]: found relay ip 13.56.226.127 for src 23.212.185.4
+driad        16:04:36 2021-02-04 00:04:36,039[INFO]: launching gateway to relay 13.56.226.127
+driad        16:04:36 2021-02-04 00:04:36,039[INFO]: running: /usr/bin/docker create --rm --name ingest-gw-13.56.226.127 --privileged --log-opt max-size=2m --log-opt max-file=5 --network amt-bridge grumpyoldtroll/amtgw:0.0.4 13.56.226.127
+driad        16:04:36 2021-02-04 00:04:36,332[INFO]: running: /usr/bin/docker network connect mcast-native-ingest ingest-gw-13.56.226.127
+driad        16:04:37 2021-02-04 00:04:37,531[INFO]: running: /usr/bin/docker start ingest-gw-13.56.226.127
+driad        16:04:38 2021-02-04 00:04:38,881[INFO]: launching join for (IPv4Address('23.212.185.4'), IPv4Address('232.1.1.1'))
+driad        16:04:38 2021-02-04 00:04:38,882[INFO]: running /usr/bin/stdbuf -oL -eL /bin/ssm-stay-joined 23.212.185.4 232.1.1.1 65534
+~~~
+
+This describes noticing the (S,G) from the joinfile produced by cbacc, discovering the relay with a [DRIAD](https://www.rfc-editor.org/rfc/rfc8777.html)-style AMTRELAY DNS query, and launching the corresponding amtgw container to connect to the relay, plus advertising the join into the tunnel.
+
+### Data Traffic
+
+Once the AMT relay is launched, some AMT traffic and some native multicast traffic should show up in the logs.
+
+The ingest-troubleshoot.sh functions for [watch_traffic](ingest-troubleshoot.sh#L59) and [watch_amt](ingest-troubleshoot.sh#L73) limit the count of packets to avoid spamming the log for high rate streams, but still showing that traffic was flowing at the given points in the network.
+
+The AMT traffic is received as UDP by a particular `amtgw` container instance, then the native multicast data traffic is forwarded in the `mcast-native-ingest` docker network, which gets forwarded onto `downstream-mcast` because of the multicast routing set up by the `pimd` instance running inside `pimwatch`.
+
+Since the `downstream-mcast` network is connected to an interface on the downstreqm network, the native traffic then should get sent through the network toward the receiver.
+
+The sample-troubleshoot.log file has 3 different tags relevant to the data traffic observed:
+
+ - **amt**: the AMT traffic between an `amtgw` instance and a remote AMT relay
+ - **traffic-in**: the native UDP data traffic seen emitted from the ingest device
+ - **traffic-acc**: the native UDP data traffic that reaches the access network connected to the receiver.
+
+#### AMT
+
+The AMT traffic up to the first data packet appears at [line 60](sample-troubleshoot.log#L60):
+
+~~~
+amt          16:04:40 00:04:39.948315 IP 10.9.1.3.59526 > 13.56.226.127.2268: UDP, length 8
+amt          16:04:40 00:04:39.983137 IP 13.56.226.127.2268 > 10.9.1.3.59526: UDP, length 12
+amt          16:04:40 00:04:39.984126 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 8
+amt          16:04:40 00:04:39.984282 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 8
+amt          16:04:40 00:04:40.011496 IP 13.56.226.127.2268 > 10.9.1.3.41265: UDP, length 44
+amt          16:04:40 00:04:40.011499 IP 13.56.226.127.2268 > 10.9.1.3.41265: UDP, length 44
+amt          16:04:40 00:04:40.012415 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 60
+amt          16:04:40 00:04:40.012623 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 72
+amt          16:04:40 00:04:40.143326 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 8
+amt          16:04:40 00:04:40.171184 IP 13.56.226.127.2268 > 10.9.1.3.41265: UDP, length 44
+amt          16:04:40 00:04:40.171963 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 56
+amt          16:04:40 00:04:40.271085 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 8
+amt          16:04:40 00:04:40.295596 IP 13.56.226.127.2268 > 10.9.1.3.41265: UDP, length 44
+amt          16:04:40 00:04:40.296264 IP 10.9.1.3.41265 > 13.56.226.127.2268: UDP, length 72
+amt          16:04:40 00:04:40.522767 IP 13.56.226.127.2268 > 10.9.1.3.41265: UDP, length 155
+~~~
+
+It's marked by the **amt** tag, as passed as the first argument to the `watch_amt` function in [ingest-troubleshoot.sh](ingest-troubleshoot.sh#L100).
+
+The output comes from running `tcpdump -i $IFACE -n -c 40 udp port 2268` (2268 is the [UDP port number for AMT](https://www.rfc-editor.org/rfc/rfc7450.html#section-7.2) traffic).
+
+The packets of length 8, 12, 44, 60, and 72 are the AMT handshake and group membership request/report packets.  The 72 length can vary when there are multiple groups joined, and in general they can vary some when connecting to different relays.  They also will have different values when using IPv6.  But in general, those starting and periodically refreshing control packets have nothing to do with the size of the data packets.
+
+The packets of length 155 are 155 because the data packets for this stream are length 125, and those get encapsulated with an extra IP header (20 bytes), an extra UDP header (8 bytes), and an AMT Data header (2 bytes).
+When receiving traffic of a different size, the AMT packet sizes will vary with the data packet size, adding that same overhead (or a larger number for IPv6, reflecting the larger header size).
+
+#### Native Multicast Traffic
+
+The sample script shows traffic in 2 locations.  The first log line showing a data packet emitted by the ingest platform is at [line 68](sample-troubleshoot.log#L68) and looks like this:
+
+~~~
+traffic-in   16:04:40 00:04:40.526740 IP 23.212.185.4.5001 > 232.1.1.1.5001: UDP, length 125
+~~~
+
+That's marked with **traffic-in**, as passed as the first parameter to the `watch_traffic` function at [line 101](ingest-troubleshoot.sh#L101) of ingest-troubleshoot.sh.
+
+The first log line showing a data packet forwarded on the LAN connected to the receiver is at [line 84](sample-troubleshoot.log#L84) and looks like this:
+
+~~~
+traffic-acc  16:04:41 00:04:40.523571 IP 23.212.185.4.5001 > 232.1.1.1.5001: UDP, length 125
+~~~
+
+That's marked with **traffic-acc**, as passed as the first parameter to the `watch_traffic` function at [line 102](ingest-troubleshoot.sh#L102) of ingest-troubleshoot.sh.
+
+The `watch_traffic` function outputs lines from `tcpdump -i $IFACE -n -c 10 udp and net 224.0.0.0/4`.
 
 # Resources
 
