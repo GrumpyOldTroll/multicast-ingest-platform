@@ -43,6 +43,12 @@ def setup_logger(name, verbosity=0):
     _logger.setLevel(log_level)
     return _logger
 
+stopping = False
+def stop_handler(signum, frame):
+    global stopping, logger
+    logger.info(f'{datetime.now()}: stopping cbacc-mgr.py')
+    stopping = True
+
 class Context(object):
     def __init__(self):
         self.session = None
@@ -431,7 +437,7 @@ def read_joinfile(fname, sgmgr):
     sgmgr.update_sgset(sgs, pops)
 
 def main(args_in):
-    global logger, sgmgr
+    global logger, sgmgr, stopping
 
     parser = argparse.ArgumentParser(
         description='''This operates a CBACC filter on a joinfile, producing
@@ -470,6 +476,10 @@ priority.
     default_bw *= 1024*1024
     bandwidth = args.bandwidth*1024*1024
 
+    signal.signal(signal.SIGTERM, stop_handler)
+    signal.signal(signal.SIGINT, stop_handler)
+    signal.signal(signal.SIGHUP, stop_handler)
+
     ctx = Context()
     sgmgr = SGManager(ctx, args.output_file, default_bw, bandwidth)
 
@@ -492,7 +502,7 @@ priority.
     observer.start()
 
     try:
-        while True:
+        while not stopping:
             time.sleep(1)
     except KeyboardInterrupt:
         pass

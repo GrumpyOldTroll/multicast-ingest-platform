@@ -7,7 +7,14 @@ import time
 import os
 import signal
 
+stopping=False
+def stop_handler(signum, frame):
+    global stopping
+    print(f'{datetime.now()}: stopping mnat-egress.py')
+    stopping = True
+
 def main(args_in):
+    global stopping
     parser = argparse.ArgumentParser(
             description='''
 This runs pimd and watches pim messages on the given downstream
@@ -36,6 +43,10 @@ smcroutectl, and expects to use the host network.''')
     upstream = 'eth1'
     downstream = 'eth0'
     os.environ["PYTHONUNBUFFERED"] = "1"
+
+    signal.signal(signal.SIGTERM, stop_handler)
+    signal.signal(signal.SIGINT, stop_handler)
+    signal.signal(signal.SIGHUP, stop_handler)
 
     watch_cmd = [
         '/usr/bin/stdbuf', '-oL', '-eL',
@@ -100,7 +111,7 @@ phyint eth1 enable
     pim_p = subprocess.Popen(pim_cmd)
 
     pim_ret, watch_ret = None, None
-    while pim_ret is None and watch_ret is None:
+    while pim_ret is None and watch_ret is None and not stopping:
         time.sleep(1)
         watch_ret = watch_p.poll()
         pim_ret = pim_p.poll()
@@ -114,8 +125,8 @@ phyint eth1 enable
             time.sleep(0.1)
         if watch_ret is None:
             watch_p.kill()
-        print(f'pimwatch killed ({watch_ret}) because frr stopped')
-    elif pim_ret is None:
+        print(f'pimwatch killed ({watch_ret})')
+    if pim_ret is None:
         pim_p.send_signal(signal.SIGTERM)
         for i in range(15):
             pim_ret = pim_p.poll()
@@ -124,7 +135,7 @@ phyint eth1 enable
             time.sleep(0.1)
         if pim_ret is None:
             pim_p.kill()
-        print(f'pim killed ({pim_ret}) because pimwatch stopped')
+        print(f'pim killed ({pim_ret})')
 
 if __name__=="__main__":
     ret = main(sys.argv)

@@ -7,7 +7,14 @@ import sys
 import time
 import signal
 
+stopping = False
+def stop_handler(signum, frame):
+    global stopping
+    print(f'{datetime.now()}: stopping driad-ingest')
+    stopping = True
+
 def main(args_in):
+    global stopping
     parser = argparse.ArgumentParser(
             description='''
 This runs driad-ingest-mgr in the expected docker container layout.
@@ -61,13 +68,20 @@ specific paths by default if they are present.  This happens with:
     if verbosity:
         ingest_cmd.append(verbosity)
 
+    signal.signal(signal.SIGTERM, stop_handler)
+    signal.signal(signal.SIGINT, stop_handler)
+    signal.signal(signal.SIGHUP, stop_handler)
 
     ingest_p = subprocess.Popen(ingest_cmd)
 
     ingest_ret = None
-    while ingest_ret is None:
+    while ingest_ret is None and not stopping:
         ingest_ret = ingest_p.poll()
         time.sleep(1)
+
+    if ingest_ret is None:
+        ingest_p.send_signal(signal.SIGTERM)
+        ingest_p.wait(2)
 
     return ingest_ret
 
