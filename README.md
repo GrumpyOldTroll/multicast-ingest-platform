@@ -126,7 +126,7 @@ NB2: On ubuntu 18 and 20, the default "sudo apt-get install docker.io" state has
 
     ~~~
     sudo systemctl enable docker.service
-    sudo systemctl enable container.service
+    sudo systemctl enable containerd.service
     ~~~
 
   - all docker commands require sudo after the default install.  Note that although this is [simple to fix](https://docs.docker.com/engine/install/linux-postinstall/#manage-docker-as-a-non-root-user), some containers require --privileged, and these may need to be run with sudo regardless.  Hopefully a future version can improve on this by using more [narrow capabilities](https://docs.docker.com/engine/reference/run/#runtime-privilege-and-linux-capabilities) explicitly.
@@ -152,7 +152,7 @@ BW_MAX_MIBPS=50
 JOINFILE=${HOME}/pimwatch/pimwatch.sgs
 CBJOINFILE=${HOME}/cbacc/cbacc.sgs
 
-INGEST_VERSION=0.0.5
+INGEST_VERSION=0.0.6
 ~~~
 
 Variable meanings:

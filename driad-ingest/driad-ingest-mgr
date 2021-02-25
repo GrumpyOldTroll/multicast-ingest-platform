@@ -454,8 +454,15 @@ ingest-gw-18.144.22.247
 
         source = ipaddress.ip_address(source)
         group = ipaddress.ip_address(group)
+        # using "Decomissioned" [sic] port 1783 for listen.
+        # not trying to actually receive traffic, just making the join.
+        # (tho it doesn't matter if we receive traffic, and we'd get a
+        # maybe-useful packet count if we did, but we'd have to know the
+        # port also, which isn't in the PIM join, or it'd have to use a
+        # raw socket with permissions escalation)
         cmd = ['/usr/bin/stdbuf', '-oL', '-eL',
-            '/bin/ssm-stay-joined', str(source), str(group), '65534']
+            '/usr/bin/mcrx-check', '-s', str(source), 
+            '-g', str(group), '-p', '1783', '-d', '0', '-c', '0']
         logger.info(f'running {" ".join(cmd)}')
         join_p = subprocess.Popen(cmd)
 
@@ -560,7 +567,11 @@ ingest-gw-18.144.22.247
             live_sg = self.live_sgs[ip_sg]
             if live_sg.join_p:
                 live_sg.join_p.send_signal(signal.SIGTERM)
-                live_sg.join_p.kill()
+                try:
+                    live_sg.join_p.wait(1)
+                except subprocess.TimeoutException as e:
+                    live_sg.join_p.kill()
+                    logger.warning(f'killed process {live_sg.join_p.pid} keeping {ip_sg} alive that did not close after SIGTERM')
             del(self.live_sgs[ip_sg])
 
         if ip_sg not in gw.live_sgs:

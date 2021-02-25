@@ -10,7 +10,7 @@
 set -e
 set -x
 
-VERSION=0.0.5
+VERSION=0.0.6
 
 for NAME in pimwatch driad-ingest cbacc ; do
   IMG=$(sudo docker image ls $NAME:latest | grep latest | awk '{print $3;}')

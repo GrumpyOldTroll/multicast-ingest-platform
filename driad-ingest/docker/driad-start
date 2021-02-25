@@ -28,10 +28,7 @@ and forward them downstream.
 
 The set of joined (S,G)s comes from monitoring (in the docker container's
 context) the file /var/run/ingest/joined.sgs for the set of actively
-joined (S,G)s.  Changes to this file will result in launching or
-tearing down the join state in smcroutectl and in the amtgw docker
-containers maintaining the AMT tunnels.  The join interface for
-smcroutectl is given by the --interface arg.
+joined (S,G)s.
 
 Since this is designed as the docker entry point, it will use docker-
 specific paths by default if they are present.  This happens with:

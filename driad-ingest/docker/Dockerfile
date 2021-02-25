@@ -5,10 +5,8 @@ RUN apt-get update && apt-get install -y \
     autoconf libtool-bin make \
     git
 
-RUN git clone https://github.com/GrumpyOldTroll/libmcrx /tmp/libmcrx
-RUN cd /tmp/libmcrx && ./autogen.sh && ./configure --enable-static && make
-COPY driad-ingest/ssm-stay-joined.c /tmp/
-RUN gcc -o /tmp/ssm-stay-joined -isystem /tmp/libmcrx/include /tmp/ssm-stay-joined.c /tmp/libmcrx/src/.libs/libmcrx.a
+RUN git -c advice.detachedHead=false clone -b 0.0.2 --depth 1 https://github.com/GrumpyOldTroll/libmcrx /tmp/libmcrx
+RUN cd /tmp/libmcrx && ./autogen.sh && ./configure && make
 
 FROM ubuntu:focal
 LABEL maintainer="jholland@akamai.com"
@@ -23,7 +21,7 @@ RUN apt-get update && \
 
 RUN pip3 install watchdog
 
-COPY --from=0 /tmp/ssm-stay-joined /bin/ssm-stay-joined
+COPY --from=0 /tmp/libmcrx/mcrx-check /usr/bin/mcrx-check
 
 RUN mkdir -p /var/run/ingest/ && touch /var/run/ingest/joined.sgs
 
