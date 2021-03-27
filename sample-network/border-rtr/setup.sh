@@ -68,7 +68,7 @@ systemctl restart bind9
 # dhcp for downstream and reflector
 apt install -y isc-dhcp-server
 cp etc/dhcp/dhcpd.conf /etc/dhcp/
-cp etc/default/isc-dhcp-server /etc/default/isc-dhcp-server
+cp etc/isc-dhcp-server /etc/default/isc-dhcp-server
 # dhcp server is not coming up at boot.  applying patch --jake 2020-11
 patch -i ${PWD}/../isc-dhcp-server.service.patch -d /lib/systemd/system -p 0
 systemctl enable isc-dhcp-server.service
