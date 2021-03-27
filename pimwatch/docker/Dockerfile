@@ -1,9 +1,11 @@
 #FROM troglobit/pimd:2.3.2
 
-FROM alpine:3.9
-RUN apk add --update git build-base automake autoconf linux-headers
+FROM ubuntu:focal
 
-RUN apk add --update pkgconfig
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    autoconf libtool-bin make \
+    git
 
 RUN git clone --depth=1 https://github.com/troglobit/pimd.git /root/pimd
 WORKDIR /root/pimd
@@ -14,9 +16,15 @@ RUN patch -p1 -i /tmp/pimd-hack.patch
 RUN make
 RUN make install-strip DESTDIR=/tmp
 
-FROM alpine:3.9
-RUN apk add python3 coreutils tcpdump
-RUN ln -s /usr/sbin/tcpdump /usr/bin/tcpdump
+FROM ubuntu:focal
+LABEL maintainer="jholland@akamai.com"
+
+RUN apt-get update && \
+  apt-get install -y \
+    python3 \
+    python3-pip \
+    tcpdump \
+    iproute2
 
 COPY --from=0 /tmp/usr/sbin/pimd /tmp/usr/sbin/pimctl /usr/sbin/
 COPY pimwatch/pimwatch.py /usr/sbin/pimwatch.py

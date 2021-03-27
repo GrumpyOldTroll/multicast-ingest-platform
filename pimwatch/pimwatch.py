@@ -37,7 +37,7 @@ class PimNotice(object):
         return 'Joins[%s]; Prunes[%s]' % (joins, prunes)
 
 def pimdump_lines(ifname):
-    cmd = ['/usr/bin/stdbuf', '-oL', '-eL', '/usr/bin/tcpdump', '-i', ifname, '-vvv', '-n', '-Qin', 'pim']
+    cmd = ['/usr/bin/stdbuf', '-oL', '-eL', '/usr/sbin/tcpdump', '-i', ifname, '-vvv', '-n', '-Qin', 'pim']
     popen = subprocess.Popen(cmd, stdout=subprocess.PIPE, universal_newlines=True)
     for stdout_line in iter(popen.stdout.readline, ""):
         yield stdout_line

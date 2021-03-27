@@ -6,11 +6,12 @@ import sys
 import time
 import os
 import signal
+from datetime import datetime
 
 stopping=False
 def stop_handler(signum, frame):
     global stopping
-    print(f'{datetime.now()}: stopping mnat-egress.py')
+    print(f'{datetime.now()}: stopping pimwatch')
     stopping = True
 
 def main(args_in):
