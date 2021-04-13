@@ -135,7 +135,7 @@ There's also scripts in [ingest-host](ingest-host/) to bring the ingest-rtr from
 git clone https://github.com/GrumpyOldTroll/multicast-ingest-platform.git
 cd multicast-ingest-platform/
 cd sample-network/ingest-host/
-./setup.sh && && sudo reboot
+./setup.sh && sudo reboot
 
 # then log back in, go back to ingest-host:
 ./setup2.sh
